@@ -15,18 +15,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     outputs:
-      site-dir: ${{ steps.mk.outputs.site }}
+      site: ${{ steps.mk.outputs.site }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: 'npm' }
-
       - run: npm ci
       - run: npx playwright install --with-deps
-      - run: npx playwright test || true   # allow site to publish even if tests fail
+      - run: npx playwright test || true
 
-      # (your existing artifacts continue to upload as-is)
+      # (keep your artifacts if you want)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -38,31 +36,37 @@ jobs:
           name: junit-results
           path: test-results/results.xml
 
-      # Build the static site into ./site (index.html + copy artifacts you want to expose)
+      # Build the static site (must contain index.html at root)
       - id: mk
-        name: Build site folder
+        name: Build site
         if: always()
         run: |
           set -eux
           mkdir -p site/runs/${{ github.run_number }}
-          # copy your HTML & XML into the site (adjust paths as needed)
+
+          # Copy reports (exists only if Playwright produced them)
           [ -f playwright-report/report.html ] && cp playwright-report/report.html site/runs/${{ github.run_number }}/report.html || true
           [ -f test-results/results.xml ] && cp test-results/results.xml site/runs/${{ github.run_number }}/results.xml || true
-          # write a minimal index
-          cat > site/index.html <<EOF
-          <!doctype html><meta charset="utf-8">
-          <title>Runs</title>
-          <h1>Runs</h1>
-          <p>Current run: <a href="runs/${{ github.run_number }}/">#${{ github.run_number }}</a></p>
-          EOF
-          echo "site=$(pwd)/site" >> $GITHUB_OUTPUT
 
-      # ✅ Upload exactly ONE Pages artifact
+          # Minimal index so root isn't 404
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>Playwright Runs</title>
+          <h1>Playwright Runs</h1>
+          <p>Current run: <a href="runs/${{ github.run_number }}/">#${{ github.run_number }}</a></p>
+          <p>Report: <a href="runs/${{ github.run_number }}/report.html">report.html</a> (if present)</p>
+          <p>JUnit: <a href="runs/${{ github.run_number }}/results.xml">results.xml</a> (if present)</p>
+          HTML
+
+          echo "site=$PWD/site" >> $GITHUB_OUTPUT
+
+      # Upload exactly ONE Pages artifact
       - name: Upload Pages artifact
         if: always()
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ steps.mk.outputs.site }}   # <- only this upload creates the "github-pages" artifact
+          path: ${{ steps.mk.outputs.site }}
 
   deploy:
     needs: test
