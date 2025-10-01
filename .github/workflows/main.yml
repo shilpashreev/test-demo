@@ -1,4 +1,4 @@
-name: Playwright JS
+name: Playwright JS (Pages)
 
 on: [push, workflow_dispatch]
 
@@ -12,81 +12,236 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  test-and-build-site:
     runs-on: ubuntu-latest
     outputs:
       site: ${{ steps.mk.outputs.site }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: 'npm' }
+
       - run: npm ci
       - run: npx playwright install --with-deps
-      - run: npx playwright test --reporter=junit,html,line --output=./test-results
 
-      # (keep your artifacts if you want)
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-             name: junit-results
-             path: test-results/**/*.xml
-
-      - name: Update manifest.json
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
-          RUN_ID: ${{ github.run_id }}
-          SHA: ${{ github.sha }}
-          REF_NAME: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
-          ACTOR: ${{ github.actor }}
+      # Ensure JUnit + HTML reporters are enabled (only writes if no config file exists)
+      - name: Ensure Playwright reporters (only if missing)
         run: |
+          set -eux
+          if [ ! -f playwright.config.ts ] && [ ! -f playwright.config.js ]; then
+            cat > playwright.config.ts <<'TS'
+            import { defineConfig } from '@playwright/test';
+            export default defineConfig({
+              reporter: [
+                ['junit', { outputFile: 'test-results/results.xml' }],
+                ['html',  { outputFolder: 'playwright-report', open: 'never' }],
+                ['line']
+              ]
+            });
+            TS
+          fi
+
+      # Run tests; keep site publishing even if tests fail
+      - run: npx playwright test || true
+
+      # (Optional) show what got produced
+      - name: List outputs
+        if: always()
+        run: |
+          echo "== test-results =="
+          find test-results -type f -maxdepth 2 -print || true
+          echo "== playwright-report =="
+          find playwright-report -type f -maxdepth 2 -print || true
+
+      # Build the static site folder
+      - id: mk
+        name: Build site folder
+        if: always()
+        run: |
+          set -eux
+
+          RUN_DIR="site/runs/${{ github.run_number }}"
+          mkdir -p "$RUN_DIR"
+
+          # Copy artifacts into the run folder (if present)
+          [ -f playwright-report/report.html ] && cp playwright-report/report.html "$RUN_DIR"/report.html || true
+          [ -d test-results ] && cp -r test-results "$RUN_DIR"/ || true
+
+          # Update manifest.json (aggregate all XMLs found under this run)
           python3 - <<'PY'
           import json, os, time, glob, xml.etree.ElementTree as ET
-          site_dir = "site"; os.makedirs(site_dir, exist_ok=True)
+
+          site_dir = "site"
+          os.makedirs(site_dir, exist_ok=True)
           manifest_path = os.path.join(site_dir, "manifest.json")
+
           try:
-            manifest = json.load(open(manifest_path)) 
-        except Exception:
-            manifest = []
-    
+              with open(manifest_path, "r") as f:
+                  manifest = json.load(f)
+          except Exception:
+              manifest = []
+
+          run_dir = f"site/runs/{os.environ['GITHUB_RUN_NUMBER']}"
+          xmls = glob.glob(os.path.join(run_dir, "test-results", "**", "*.xml"), recursive=True)
+
           tests = failures = errors = skipped = 0
           total_time = 0.0
-          suite_name = "playwright"
           found = False
+          for fp in xmls:
+              try:
+                  root = ET.parse(fp).getroot()
+                  suites = [root] if root.tag == "testsuite" else root.findall(".//testsuite")
+                  for ts in suites:
+                      found = True
+                      tests    += int(ts.get("tests", 0) or 0)
+                      failures += int(ts.get("failures", 0) or 0)
+                      errors   += int(ts.get("errors", 0) or 0)
+                      skipped  += int(ts.get("skipped", ts.get("disabled", 0) or 0) or 0)
+                      try:
+                          total_time += float(ts.get("time", 0.0) or 0.0)
+                      except:
+                          pass
+              except Exception:
+                  pass
 
-            for fp in glob.glob("artifacts/junit/**/*.xml", recursive=True):
-              found = True
-           try:
-            root = ET.parse(fp).getroot()
-            suites = [root] if root.tag == "testsuite" else root.findall(".//testsuite")
-            for ts in suites:
-                tests    += int(ts.get("tests", 0))
-                failures += int(ts.get("failures", 0))
-                errors   += int(ts.get("errors", 0))
-                skipped  += int(ts.get("skipped", ts.get("disabled", 0) or 0))
-                try: total_time += float(ts.get("time", 0.0) or 0.0)
-                except: pass
-        except Exception: pass
+          status = "pass" if found and failures == 0 and errors == 0 else ("unknown" if not found else "fail")
 
-    status = "pass" if found and failures == 0 and errors == 0 else ("unknown" if not found else "fail")
+          entry = {
+              "run_number": int(os.environ["GITHUB_RUN_NUMBER"]),
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "sha": os.environ["GITHUB_SHA"],
+              "branch": os.environ["GITHUB_REF_NAME"],
+              "event": os.environ["GITHUB_EVENT_NAME"],
+              "actor": os.environ["GITHUB_ACTOR"],
+              "timestamp": int(time.time()),
+              "suite": "playwright",
+              "stats": {
+                  "tests": tests, "failures": failures, "errors": errors,
+                  "skipped": skipped, "time": round(total_time, 2)
+              },
+              "path": f"runs/{os.environ['GITHUB_RUN_NUMBER']}/"
+          }
 
-    entry = {
-      "run_number": int(os.environ["RUN_NUMBER"]),
-      "run_id": int(os.environ["RUN_ID"]),
-      "sha": os.environ["SHA"],
-      "branch": os.environ["REF_NAME"],
-      "event": os.environ["EVENT_NAME"],
-      "actor": os.environ["ACTOR"],
-      "timestamp": int(time.time()),
-      "suite": suite_name,
-      "stats": { "tests": tests, "failures": failures, "errors": errors, "skipped": skipped, "time": round(total_time, 2) },
-      "status": status,
-      "path": f"runs/{os.environ['RUN_NUMBER']}/"
-    }
+          manifest.append(entry)
+          manifest = sorted(manifest, key=lambda x: x["run_number"])[-200:]
 
-    manifest.append(entry)
-    manifest = sorted(manifest, key=lambda x: x["run_number"])[-200:]
-    json.dump(manifest, open(manifest_path, "w"), indent=2)
-    PY
+          with open(manifest_path, "w") as f:
+              json.dump(manifest, f, indent=2)
+          PY
 
-     
+          # Write / refresh index.html
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1"/>
+            <title>Playwright Runs</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+            <style>
+              body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px;}
+              h1{margin:0 0 12px;}
+              .muted{color:#666}
+              table{border-collapse:collapse;width:100%;margin-top:16px}
+              th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left;font-size:14px}
+              th{background:#fafafa}
+              .pill{padding:2px 8px;border-radius:999px;font-weight:600;font-size:12px;display:inline-block}
+              .pass{background:#e7f8ee;color:#0a7f40}
+              .fail{background:#ffebea;color:#b00020}
+              .grid{display:grid;grid-template-columns:1fr;gap:24px}
+              @media (min-width:900px){.grid{grid-template-columns:1.2fr .8fr;}}
+              canvas{max-height:360px}
+              a{color:#0069c2;text-decoration:none}
+              a:hover{text-decoration:underline}
+              footer{margin-top:24px;color:#777;font-size:12px}
+            </style>
+          </head>
+          <body>
+            <h1>Playwright Test Runs</h1>
+            <div class="muted">Click a run to view its report and JUnit XML.</div>
+            <div class="grid">
+              <div>
+                <table id="runs">
+                  <thead>
+                    <tr>
+                      <th>#</th><th>Status</th><th>Branch</th><th>Tests</th><th>Fails</th><th>Errors</th><th>Skipped</th><th>Time (s)</th><th>When</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div>
+                <canvas id="chart"></canvas>
+              </div>
+            </div>
+            <footer>Last updated <span id="updated"></span>.</footer>
+            <script>
+            async function main(){
+              const res = await fetch('manifest.json', {cache:'no-store'});
+              const data = await res.json();
+              data.sort((a,b)=>b.run_number-a.run_number);
+
+              const tbody = document.querySelector('#runs tbody');
+              const fmt = n => Intl.NumberFormat().format(n);
+              const when = ts => new Date(ts*1000).toLocaleString();
+
+              const last15 = data.slice(0,15).reverse();
+
+              for(const r of data){
+                const url = r.path;
+                const pill = r.status === 'pass' ? '<span class="pill pass">PASS</span>' :
+                             r.status === 'fail' ? '<span class="pill fail">FAIL</span>' :
+                             '<span class="pill">UNKNOWN</span>';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td><a href="${url}">#${r.run_number}</a></td>
+                  <td>${pill}</td>
+                  <td>${r.branch}</td>
+                  <td>${fmt(r.stats.tests)}</td>
+                  <td>${fmt(r.stats.failures)}</td>
+                  <td>${fmt(r.stats.errors)}</td>
+                  <td>${fmt(r.stats.skipped)}</td>
+                  <td>${fmt(r.stats.time)}</td>
+                  <td>${when(r.timestamp)}</td>`;
+                tbody.appendChild(tr);
+              }
+
+              const labels = last15.map(r=>`#${r.run_number}`);
+              const pass = last15.map(r=> Math.max(0, r.stats.tests - r.stats.failures - r.stats.errors - r.stats.skipped));
+              const fail = last15.map(r=> r.stats.failures + r.stats.errors);
+
+              new Chart(document.getElementById('chart'), {
+                type: 'bar',
+                data: { labels, datasets: [
+                  {label:'Pass', data: pass, stack:'s'},
+                  {label:'Fail', data: fail, stack:'s'}
+                ]},
+                options: { responsive:true, plugins:{ legend:{ position:'top'}},
+                  scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true } } }
+              });
+
+              document.getElementById('updated').textContent = new Date().toLocaleString();
+            }
+            main();
+            </script>
+          </body>
+          </html>
+          HTML
+
+          echo "site=$PWD/site" >> $GITHUB_OUTPUT
+
+      # Upload exactly one Pages artifact
+      - name: Upload Pages artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.mk.outputs.site }}
+
+  deploy:
+    needs: test-and-build-site
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
