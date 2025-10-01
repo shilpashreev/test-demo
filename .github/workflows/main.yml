@@ -24,6 +24,7 @@ jobs:
 
       - run: npm ci
       - run: npx playwright install --with-deps
+      - run: npx playwright test --reporter=junit,html,line || true
 
       # Ensure JUnit + HTML reporters are enabled (only writes if no config file exists)
       - name: Ensure Playwright reporters (only if missing)
