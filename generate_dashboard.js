@@ -37,7 +37,6 @@ function updateHistory(newResult) {
                 failed: run.failed || 0,
                 skipped: run.skipped || 0,
                 duration: run.duration || 0,
-                // Ensure runUrl exists, even if empty for old entries
                 runUrl: run.runUrl || '' 
             }));
             
@@ -60,7 +59,6 @@ function updateHistory(newResult) {
         console.warn("Could not find valid test statistics in the JSON report. Using zeros for the current run.");
     }
 
-    // 💡 NEW LOGIC: Construct the GitHub Actions Run URL
     let runUrl = '';
     if (GITHUB_SERVER_URL && GITHUB_REPOSITORY && GITHUB_RUN_ID) {
         runUrl = `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`;
@@ -77,7 +75,7 @@ function updateHistory(newResult) {
         failed: stats.failed, 
         skipped: stats.skipped, 
         duration: Math.round((stats.duration || 0) / 1000 / 60), // minutes
-        runUrl // 💡 Save the run URL
+        runUrl
     };
 
     // Update or add the current run (to only keep one per day)
@@ -105,14 +103,22 @@ function generateDashboard(history) {
     const passedData = history.map(run => run.passed || 0);
     const failedData = history.map(run => run.failed || 0);
 
-    const lastRun = history[history.length - 1];
-    const currentStats = lastRun ? {
-        total: lastRun.total || 0,
-        passed: lastRun.passed || 0,
-        failed: lastRun.failed || 0,
-        skipped: lastRun.skipped || 0
+    // Get the current (latest) run stats
+    const currentRun = history[history.length - 1];
+    // Get the run immediately prior to the current run
+    const previousRun = history.length >= 2 ? history[history.length - 2] : null;
+
+    const currentStats = currentRun ? {
+        total: currentRun.total || 0,
+        passed: currentRun.passed || 0,
+        failed: currentRun.failed || 0,
+        skipped: currentRun.skipped || 0
     } : { total: 0, passed: 0, failed: 0, skipped: 0 };
     
+    // 💡 NEW METRICS FOR COMPARISON
+    const currentPassCount = currentStats.passed;
+    const previousPassCount = previousRun ? previousRun.passed || 0 : 0;
+
     // Helper functions
     const formatTime = (isoString) => {
         if (!isoString) return 'N/A';
@@ -127,7 +133,7 @@ function generateDashboard(history) {
         return `${(minutes * 60).toFixed(1)}s`;
     }
 
-    // 💡 NEW LOGIC: Generate the detailed history table HTML with links
+    // Generate the detailed history table HTML with links
     const historyTableRows = history.slice().reverse().map(run => {
         const dateTime = `${run.date} @ ${formatTime(run.timestamp)}`;
         const dateCell = run.runUrl 
@@ -145,7 +151,6 @@ function generateDashboard(history) {
             </tr>
         `;
     }).join('');
-    // 💡 END NEW LOGIC
     
     const html = `
 <!DOCTYPE html>
@@ -156,18 +161,22 @@ function generateDashboard(history) {
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-        .stats { margin-bottom: 30px; }
+        .stats { margin-bottom: 30px; display: flex; gap: 15px; } /* Update to flex layout */
         h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .stat-box { 
           padding: 15px; 
           border-radius: 5px; 
-          display: inline-block; 
-          margin-right: 15px; 
+          min-width: 150px; /* Ensure boxes are readable */
+          text-align: center;
           color: white; 
         }
+        .stat-box h3 { margin: 0; font-size: 1.2em; }
+        .stat-box p { margin: 5px 0 0 0; font-size: 1.5em; font-weight: bold; }
         .passed { background-color: #4CAF50; }
         .failed { background-color: #F44336; }
         .total { background-color: #2196F3; }
+        .prev-passed { background-color: #17a2b8; } /* A neutral color for comparison */
+
         .history-table {
             width: 100%;
             border-collapse: collapse;
@@ -189,7 +198,7 @@ function generateDashboard(history) {
         }
         .history-table td a {
             text-decoration: none;
-            color: #0366d6; /* GitHub blue link color */
+            color: #0366d6; 
             font-weight: bold;
         }
     </style>
@@ -198,9 +207,24 @@ function generateDashboard(history) {
     <h1>Playwright Test Dashboard (Last ${MAX_HISTORY_DAYS} Days)</h1>
 
     <div class="stats">
-        <div class="stat-box total">Total Tests: ${currentStats.total}</div>
-        <div class="stat-box passed">Passed: ${currentStats.passed}</div>
-        <div class="stat-box failed">Failed: ${currentStats.failed}</div>
+        <div class="stat-box total">
+            <h3>Total Tests</h3>
+            <p>${currentStats.total}</p>
+        </div>
+        
+        <div class="stat-box passed">
+            <h3>Passed (Current)</h3>
+            <p>${currentPassCount}</p>
+        </div>
+        <div class="stat-box failed">
+            <h3>Failed (Current)</h3>
+            <p>${currentStats.failed}</p>
+        </div>
+        
+        <div class="stat-box prev-passed">
+            <h3>Passed (Previous)</h3>
+            <p>${previousPassCount}</p>
+        </div>
     </div>
 
     <div class="grid">
@@ -281,8 +305,7 @@ function generateDashboard(history) {
 }
 
 
-
-// --- 3. Main Execution (FINAL CRASH PREVENTION) ---
+// --- 3. Main Execution (The main execution block remains the same) ---
 let newResult = {};
 let updatedHistory = [];
 
