@@ -10,6 +10,7 @@ export default defineConfig({
   reporter: [
     // This generates the interactive HTML report in 'playwright-report/'
     ['html', { open: 'never' }], 
+     ['json', { outputFile: 'results/report.json' }], 
     
     // This generates the JUnit XML report in 'results/junit.xml'
     ['junit', { outputFile: 'results/junit.xml' }],
