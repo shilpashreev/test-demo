@@ -20,6 +20,20 @@ function updateHistory(newResult) {
         try {
             history = JSON.parse(fs.readFileSync(historyFilePath, 'utf8'));
             console.log(`[HISTORY] Successfully loaded ${history.length} historical entries.`);
+            
+            // 🌟🌟🌟 FIX: Clean up old history entries with missing data 🌟🌟🌟
+            history = history.map(run => ({
+                timestamp: run.timestamp,
+                date: run.date,
+                // Ensure all core metrics default to 0 if missing from old file
+                total: run.total || 0,
+                passed: run.passed || 0,
+                failed: run.failed || 0,
+                skipped: run.skipped || 0,
+                duration: run.duration || 0
+            }));
+            // 🌟🌟🌟 End FIX 🌟🌟🌟
+            
         } catch (e) {
             console.error("Error reading history file, starting fresh:", e.message);
         }
@@ -202,4 +216,5 @@ try {
 } catch (error) {
     console.error('Failed to generate dashboard due to unexpected error:', error.message);
     process.exit(1);
+    
 }
