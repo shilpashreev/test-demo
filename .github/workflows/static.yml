@@ -71,8 +71,13 @@ jobs:
       # --- 6. Test Execution and Report Generation ---
       - name: Run Playwright tests and generate JSON/JUnit reports
         run: npx playwright test || true
-        
+      - name: Debug JSON report
+        run: |
+          echo "---- results/report.json ----"
+          cat results/report.json || echo "❌ report.json missing or unreadable"
+          echo "-----------------------------"  
       # --- 7. Verify JUnit File Exists ---
+      
       - name: Verify JUnit File Exists
         run: ls -l results/junit.xml
         
@@ -111,3 +116,27 @@ jobs:
           publish_dir: ./dashboard-output 
           publish_branch: gh-pages
           destination_dir: .
+
+      - name: Upload Dashboard HTML
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-html
+          path: dashboard-output/index.html
+
+      - name: Upload JSON Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-json
+          path: results/report.json
+
+      - name: Upload JUnit XML
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-xml
+          path: results/junit.xml
+
+
+
