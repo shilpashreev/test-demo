@@ -1,96 +1,79 @@
-name: load
+name: Playwright Tests & Deploy Report to Pages
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+  # Allows manual running of the workflow
   workflow_dispatch:
 
+# Grant necessary permissions
 permissions:
-  contents: write
-  checks: write
-
-concurrency:
-  group: "dashboard"
-  cancel-in-progress: true
+  contents: read      # For checking out the code
+  pages: write        # To deploy to GitHub Pages
+  id-token: write     # For authentication required by deploy-pages action
 
 jobs:
-  build-and-publish:
+  build_and_test:
+    name: Build & Run Tests
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Checkout code
-      - name: Checkout repository
+      # 1. Checkout Code
+      - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # Step 2: Setup Node + Playwright
-      - name: Setup Node.js
+      # 2. Setup Environment
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies & Playwright browsers
+          
+      - name: Install dependencies and browsers
         run: |
-          npm ci
+          npm install 
           npx playwright install --with-deps
-
-      # Step 3: Prepare output folders
-      - name: Prepare output directories
-        run: |
-          mkdir -p results
-          mkdir -p dashboard-output
-
-      # Step 4: Run Playwright and generate all reports
-      - name: Run Playwright Tests (JSON + JUnit + HTML)
-        run: |
-          npx playwright test --reporter=line,json=results/report.json,junit=results/junit.xml,html || true
-
-      # Step 5: Copy reports to dashboard output under runs/<run_number>
-      - name: Copy reports to dashboard
-        run: |
-          RUN_DIR="dashboard-output/runs/${{ github.run_number }}"
-          mkdir -p "$RUN_DIR"
-
-          # Copy Playwright HTML report
-          if [ -d playwright-report ]; then
-            cp -r playwright-report "$RUN_DIR/"
-          fi
-
-          # Copy raw report files
-          if [ -f results/junit.xml ]; then cp results/junit.xml "$RUN_DIR/"; fi
-          if [ -f results/report.json ]; then cp results/report.json "$RUN_DIR/"; fi
-
-      # Step 6: Create a basic index.html linking to latest run
-      - name: Create latest index.html
-        run: |
-          echo "Generating index.html..."
-          cat > dashboard-output/index.html <<EOF
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Playwright Run #${{ github.run_number }}</title>
-    <meta charset="utf-8"/>
-  </head>
-  <body>
-    <h1>Playwright Test Report – Run #${{ github.run_number }}</h1>
-    <ul>
-      <li><a href="runs/${{ github.run_number }}/playwright-report/report.html">🧪 View HTML Report</a></li>
-      <li><a href="runs/${{ github.run_number }}/junit.xml">📄 JUnit XML</a></li>
-      <li><a href="runs/${{ github.run_number }}/report.json">📊 JSON Report</a></li>
-    </ul>
-    <p>All historical runs live at <code>/runs/&lt;number&gt;/playwright-report/report.html</code></p>
-  </body>
-</html>
-EOF
-
-      # Step 7: Deploy dashboard-output to gh-pages branch
-      - name: Deploy to GitHub Pages (gh-pages branch)
-        uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main'
+          
+      # 3. Run Tests
+      - name: Run Playwright tests
+        # Use '|| true' to ensure the workflow proceeds and publishes the report 
+        # even if some tests fail.
+        run: npx playwright test || true
+      
+      # 4. (Optional) Publish JUnit Summary to Check Runs
+      # This step provides the status summary visible on the Pull Request checks tab.
+      - name: Publish JUnit XML Report to Checks
+        uses: dorny/test-reporter@v1
+        if: always()
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: dashboard-output
-          publish_branch: gh-pages
-          destination_dir: .
+          name: Playwright Test Results
+          path: results/junit.xml # Path used in your config.js
+          reporter: jest-junit
+          fail-on-error: true # Fails the Check Run, but not the job (due to 'if: always()')
+          
+      # 5. Setup Pages Action (Prepares the environment for deployment)
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        
+      # 6. Upload Report Artifact (Zips and stages the Playwright HTML folder)
+      - name: Upload Playwright Report Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Playwright's default HTML output folder
+          path: playwright-report/ 
+
+  # 7. Deployment Job
+  deploy:
+    name: Deploy Report
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    # This job only runs if the build_and_test job completes successfully
+    needs: build_and_test
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
