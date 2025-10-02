@@ -6,48 +6,49 @@ const path = require('path');
 const HISTORY_FILE = 'report_history.json';
 const MAX_HISTORY_DAYS = 15;
 const REPORTS_DIR = 'dashboard-output';
-const JSON_REPORT_PATH = 'results/report.json';
+const JSON_REPORT_PATH = 'results/report.json'; // Ensure Playwright output matches this path
 
 // --- 1. Load and Update History ---
 function updateHistory(newResult) {
     let history = [];
     const historyFilePath = path.join(REPORTS_DIR, HISTORY_FILE);
 
-    console.log(`[DEBUG] Looking for history file at: ${historyFilePath}`);
+    console.log(`[HISTORY] Looking for history file at: ${historyFilePath}`);
     
-    // Check for history file
+    // Check for history file (this is needed for subsequent runs)
     if (fs.existsSync(historyFilePath)) {
-        console.log("[DEBUG] History file FOUND. Attempting to load...");
+        console.log("[HISTORY] History file FOUND. Attempting to load...");
         try {
             history = JSON.parse(fs.readFileSync(historyFilePath, 'utf8'));
-            console.log(`[DEBUG] Successfully loaded ${history.length} historical entries.`);
+            console.log(`[HISTORY] Successfully loaded ${history.length} historical entries.`);
         } catch (e) {
             console.error("Error reading history file, starting fresh:", e.message);
         }
     } else {
-        // This is expected if it's the first run, or if the YAML copy step failed.
-        console.log("[DEBUG] History file NOT FOUND. Starting with 0 historical entries.");
+        console.log("[HISTORY] History file NOT FOUND. Starting with 0 historical entries.");
+    }
+
+    // Safely extract stats, checking if the fields exist in the report.json
+    const stats = newResult?.stats;
+    if (!stats || stats.total === 0) {
+        console.error("Error: New result data is empty or missing 'stats' block. Skipping history update.");
+        return history; // Return existing history without adding a bad entry
     }
 
     const timestamp = new Date().toISOString();
     const today = timestamp.split('T')[0];
-    const totalTests = newResult.stats.total;
-    const passed = newResult.stats.passed;
-    const failed = newResult.stats.failed;
-    const skipped = newResult.stats.skipped;
-    const duration = newResult.stats.duration;
-
+    
     const newRun = {
         timestamp,
         date: today,
-        total: totalTests,
-        passed,
-        failed,
-        skipped,
-        duration: Math.round(duration / 1000 / 60) // minutes
+        total: stats.total,
+        passed: stats.passed,
+        failed: stats.failed,
+        skipped: stats.skipped,
+        duration: Math.round(stats.duration / 1000 / 60) // minutes
     };
 
-    // Update or add the current run
+    // Update or add the current run (to only keep one per day)
     const existingIndex = history.findIndex(run => run.date === today);
     if (existingIndex !== -1) {
         history[existingIndex] = newRun;
@@ -62,7 +63,7 @@ function updateHistory(newResult) {
     
     fs.writeFileSync(historyFilePath, JSON.stringify(history, null, 2));
     
-    console.log(`[DEBUG] Final history array size after update: ${history.length}`);
+    console.log(`[HISTORY] Final history array size after update: ${history.length}`);
     return history;
 }
 
@@ -73,6 +74,7 @@ function generateDashboard(history) {
     const failedData = history.map(run => run.failed);
     const currentStats = history[history.length - 1] || { total: 0, passed: 0, failed: 0, skipped: 0 };
     
+    // The HTML content (using the template literal is correct)
     const html = `
 <!DOCTYPE html>
 <html>
@@ -126,33 +128,35 @@ function generateDashboard(history) {
         const currentSkipped = ${currentStats.skipped};
 
         // Bar Chart (Trend)
-        new Chart(document.getElementById('barChart'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
-                    { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: { x: { stacked: true }, y: { stacked: true } }
-            }
-        });
+        if (labels.length > 0) { // Check data exists before trying to draw
+            new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
+                        { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: { x: { stacked: true }, y: { stacked: true } }
+                }
+            });
 
-        // Pie Chart (Latest Run Breakdown)
-        new Chart(document.getElementById('pieChart'), {
-            type: 'pie',
-            data: {
-                labels: ['Passed', 'Failed', 'Skipped'],
-                datasets: [{
-                    data: [currentPassed, currentFailed, currentSkipped],
-                    backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
-                }]
-            },
-            options: { responsive: true }
-        });
+            // Pie Chart (Latest Run Breakdown)
+            new Chart(document.getElementById('pieChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['Passed', 'Failed', 'Skipped'],
+                    datasets: [{
+                        data: [currentPassed, currentFailed, currentSkipped],
+                        backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
+                    }]
+                },
+                options: { responsive: true }
+            });
+        }
     </script>
 </body>
 </html>
@@ -161,8 +165,15 @@ function generateDashboard(history) {
     console.log('Dashboard HTML generated successfully in ' + REPORTS_DIR);
 }
 
-// --- Main Execution ---
+// --- 3. Main Execution (THE CRITICAL PATH CHECK) ---
 try {
+    // 🔑 FATAL FIX: Check for the Playwright output file before proceeding.
+    if (!fs.existsSync(JSON_REPORT_PATH)) {
+        console.error(`ERROR: Playwright report file not found at ${JSON_REPORT_PATH}. Aborting dashboard generation.`);
+        // If the report doesn't exist, we can't get current stats, so we stop.
+        process.exit(1); 
+    }
+    
     const rawData = fs.readFileSync(JSON_REPORT_PATH, 'utf8');
     const newResult = JSON.parse(rawData);
 
@@ -172,8 +183,15 @@ try {
     }
 
     const updatedHistory = updateHistory(newResult);
-    generateDashboard(updatedHistory);
+    
+    // Only try to generate the dashboard if we have any history (at least 1 run)
+    if (updatedHistory.length > 0) {
+        generateDashboard(updatedHistory);
+    } else {
+        console.log("No valid test runs found to generate dashboard.");
+    }
+    
 } catch (error) {
-    console.error('Failed to generate dashboard:', error.message);
+    console.error('Failed to generate dashboard due to unexpected error:', error.message);
     process.exit(1);
 }
