@@ -1,0 +1,156 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Playwright Test Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        .stats { margin-bottom: 30px; display: flex; gap: 15px; } /* Update to flex layout */
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .stat-box { 
+          padding: 15px; 
+          border-radius: 5px; 
+          min-width: 150px; /* Ensure boxes are readable */
+          text-align: center;
+          color: white; 
+        }
+        .stat-box h3 { margin: 0; font-size: 1.2em; }
+        .stat-box p { margin: 5px 0 0 0; font-size: 1.5em; font-weight: bold; }
+        .passed { background-color: #4CAF50; }
+        .failed { background-color: #F44336; }
+        .total { background-color: #2196F3; }
+        .prev-passed { background-color: #17a2b8; } /* A neutral color for comparison */
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        .history-table th, .history-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .history-table th {
+            background-color: #f2f2f2;
+        }
+        .history-container {
+            margin-top: 40px;
+            max-height: 400px; 
+            overflow-y: auto; 
+        }
+        .history-table td a {
+            text-decoration: none;
+            color: #0366d6; 
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Playwright Test Dashboard (Last 15 Days)</h1>
+
+    <div class="stats">
+        <div class="stat-box total">
+            <h3>Total Tests</h3>
+            <p>0</p>
+        </div>
+        
+        <div class="stat-box passed">
+            <h3>Passed (Current)</h3>
+            <p>0</p>
+        </div>
+        <div class="stat-box failed">
+            <h3>Failed (Current)</h3>
+            <p>0</p>
+        </div>
+        
+        <div class="stat-box prev-passed">
+            <h3>Passed (Previous)</h3>
+            <p>0</p>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="chart-container">
+            <h2>Pass/Fail Trend (Bar Chart)</h2>
+            <canvas id="barChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h2>Latest Run Status (Pie Chart)</h2>
+            <canvas id="pieChart"></canvas>
+        </div>
+    </div>
+    
+    <h2>Detailed Run History (Last 1 runs) - Click Date/Time for Run Log</h2>
+    <div class="history-container">
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Run Date/Time 🔗</th>
+                    <th>Total</th>
+                    <th>Passed</th>
+                    <th>Failed</th>
+                    <th>Skipped</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+            <tr>
+                <td><a href="https://github.com/shilpashreev/test-demo/actions/runs/18192033695" target="_blank" title="View GitHub Actions Run Log">2025-10-02 @ 11:49:05</a></td>
+                <td style="color:#2196F3; font-weight:bold;">0</td>
+                <td style="color:#4CAF50;">0</td>
+                <td style="color:#F44336;">0</td>
+                <td style="color:#FFC107;">0</td>
+                <td>0.0s</td>
+            </tr>
+        
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Data from the script execution
+        const labels = ["2025-10-02"];
+        const passedData = [0];
+        const failedData = [0];
+        const currentPassed = 0;
+        const currentFailed = 0;
+        const currentSkipped = 0;
+
+        // Bar Chart (Trend)
+        if (labels.length > 0) {
+            new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
+                        { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: { x: { stacked: true }, y: { stacked: true } }
+                }
+            });
+
+            // Pie Chart (Latest Run Breakdown)
+            new Chart(document.getElementById('pieChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['Passed', 'Failed', 'Skipped'],
+                    datasets: [{
+                        data: [currentPassed, currentFailed, currentSkipped],
+                        backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
+                    }]
+                },
+                options: { responsive: true }
+            });
+        }
+    </script>
+</body>
+</html>
