@@ -19,6 +19,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # 💥 ADD THIS PERMISSIONS BLOCK TO THE JOB
+    permissions:
+      contents: read      # Keep this
+      checks: write       # <--- THIS IS REQUIRED FOR dorny/test-reporter
+      pages: write        # Keep this for the deploy job
+      id-token: write     # Keep this for the deploy job
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
