@@ -1,4 +1,4 @@
-name: Playwright Tests & Dashboard History
+name: load
 
 on:
   push:
@@ -16,111 +16,81 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_and_report:
+  build-and-publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      checks: write
 
     steps:
-      - name: Checkout main repository code
+      # Step 1: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Load prior history from gh-pages (if it exists)
-      - name: Download Previous Dashboard History
-        run: |
-          set -eux
-          git fetch origin gh-pages || echo "gh-pages branch not found (first run)."
-          mkdir -p gh-pages-temp
-          git show origin/gh-pages:report_history.json > gh-pages-temp/report_history.json || echo "no prior history"
-
-      - name: Set up Node.js
+      # Step 2: Setup Node + Playwright
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Install dependencies and browsers
+      - name: Install dependencies & Playwright browsers
         run: |
-          set -eux
           npm ci
           npx playwright install --with-deps
 
-      - name: Prepare output dirs
+      # Step 3: Prepare output folders
+      - name: Prepare output directories
         run: |
-          set -eux
           mkdir -p results
           mkdir -p dashboard-output
-          if [ -f gh-pages-temp/report_history.json ]; then
-            cp gh-pages-temp/report_history.json dashboard-output/
-          fi
 
-      # Force Playwright to emit the exact files your script expects
-      - name: Run Playwright (JSON + JUnit + HTML)
+      # Step 4: Run Playwright and generate all reports
+      - name: Run Playwright Tests (JSON + JUnit + HTML)
         run: |
-          set -eux
           npx playwright test --reporter=line,json=results/report.json,junit=results/junit.xml,html || true
 
-      # Debug: confirm what got produced
-      - name: Inspect results
+      # Step 5: Copy reports to dashboard output under runs/<run_number>
+      - name: Copy reports to dashboard
         run: |
-          set -eux
-          ls -l results || true
-          echo "---- results/report.json ----"
-          if [ -f results/report.json ]; then
-            jq .stats results/report.json || cat results/report.json
-          else
-            echo "❌ results/report.json missing"
+          RUN_DIR="dashboard-output/runs/${{ github.run_number }}"
+          mkdir -p "$RUN_DIR"
+
+          # Copy Playwright HTML report
+          if [ -d playwright-report ]; then
+            cp -r playwright-report "$RUN_DIR/"
           fi
 
-      # Publish JUnit summary to Checks (use junit schema)
-      - name: Publish JUnit XML Report
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Playwright Test Results
-          path: results/junit.xml
-          reporter: junit
-          fail-on-error: false
+          # Copy raw report files
+          if [ -f results/junit.xml ]; then cp results/junit.xml "$RUN_DIR/"; fi
+          if [ -f results/report.json ]; then cp results/report.json "$RUN_DIR/"; fi
 
-      # Build dashboard (your script writes dashboard-output/index.html)
-      - name: Generate Historical Dashboard HTML
-        run: node generate_dashboard.js
-
-      - name: Verify Dashboard Files Were Created
+      # Step 6: Create a basic index.html linking to latest run
+      - name: Create latest index.html
         run: |
-          set -eux
-          find dashboard-output -maxdepth 2 -type f -print || true
-          test -f dashboard-output/index.html
+          echo "Generating index.html..."
+          cat > dashboard-output/index.html <<EOF
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Playwright Run #${{ github.run_number }}</title>
+    <meta charset="utf-8"/>
+  </head>
+  <body>
+    <h1>Playwright Test Report – Run #${{ github.run_number }}</h1>
+    <ul>
+      <li><a href="runs/${{ github.run_number }}/playwright-report/report.html">🧪 View HTML Report</a></li>
+      <li><a href="runs/${{ github.run_number }}/junit.xml">📄 JUnit XML</a></li>
+      <li><a href="runs/${{ github.run_number }}/report.json">📊 JSON Report</a></li>
+    </ul>
+    <p>All historical runs live at <code>/runs/&lt;number&gt;/playwright-report/report.html</code></p>
+  </body>
+</html>
+EOF
 
-      # Upload artifacts for this run
-      - name: Upload Dashboard HTML
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dashboard-html
-          path: dashboard-output/index.html
-
-      - name: Upload JSON Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-json
-          path: results/report.json
-
-      - name: Upload JUnit XML
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: junit-xml
-          path: results/junit.xml
-
-      # Deploy to gh-pages (branch-based Pages)
-      - name: Deploy Dashboard with History
+      # Step 7: Deploy dashboard-output to gh-pages branch
+      - name: Deploy to GitHub Pages (gh-pages branch)
         uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dashboard-output
+          publish_dir: dashboard-output
           publish_branch: gh-pages
           destination_dir: .
