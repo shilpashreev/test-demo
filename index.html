@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Playwright Test Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        .stats { margin-bottom: 30px; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .stat-box { 
+          padding: 15px; 
+          border-radius: 5px; 
+          display: inline-block; 
+          margin-right: 15px; 
+          color: white; 
+        }
+        .passed { background-color: #4CAF50; }
+        .failed { background-color: #F44336; }
+        .total { background-color: #2196F3; }
+    </style>
+</head>
+<body>
+    <h1>Playwright Test Dashboard (Last 15 Days)</h1>
+
+    <div class="stats">
+        <div class="stat-box total">Total Tests: undefined</div>
+        <div class="stat-box passed">Passed: undefined</div>
+        <div class="stat-box failed">Failed: undefined</div>
+    </div>
+
+    <div class="grid">
+        <div class="chart-container">
+            <h2>Pass/Fail Trend (Bar Chart)</h2>
+            <canvas id="barChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h2>Latest Run Status (Pie Chart)</h2>
+            <canvas id="pieChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Data from the script execution
+        const labels = ["2025-10-02"];
+        const passedData = [null];
+        const failedData = [null];
+        const currentPassed = undefined;
+        const currentFailed = undefined;
+        const currentSkipped = 0;
+
+        // Bar Chart (Trend)
+        new Chart(document.getElementById('barChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
+                    { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: { x: { stacked: true }, y: { stacked: true } }
+            }
+        });
+
+        // Pie Chart (Latest Run Breakdown)
+        new Chart(document.getElementById('pieChart'), {
+            type: 'pie',
+            data: {
+                labels: ['Passed', 'Failed', 'Skipped'],
+                datasets: [{
+                    data: [currentPassed, currentFailed, currentSkipped],
+                    backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
+                }]
+            },
+            options: { responsive: true }
+        });
+    </script>
+</body>
+</html>
