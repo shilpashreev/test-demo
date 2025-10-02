@@ -1,43 +1,83 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+name: Playwright Tests & Report Deployment
 
+# Trigger the workflow on pushes to the main branch or manual dispatch
 on:
-  # Runs on pushes targeting the default branch
   push:
-    branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Configure permissions required for checking out code and deploying to GitHub Pages
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  contents: read      # Required for actions/checkout
+  pages: write        # Required for actions/deploy-pages
+  id-token: write     # Required for the deploy step to authenticate
 
 jobs:
-  # Single deploy job since we're just deploying
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # --- Setup Environment ---
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      
+      # --- Test Execution and Report Generation ---
+      - name: Run Playwright tests and generate reports
+        # The reports (HTML, JUnit) are generated based on playwright.config.js.
+        # '|| true' ensures the workflow continues to the deployment steps 
+        # even if tests fail, so you can see the report.
+        run: npx playwright test || true
+        
+      # --- JUnit Report: Show Summary in Workflow Run ---
+      # This action processes the JUnit XML (results/junit.xml) 
+      # and displays a pass/fail table on the workflow summary page.
+      - name: Publish JUnit XML Report
+        uses: dorny/test-reporter@v1
+        if: always() # Run regardless of test result
+        with:
+          name: Playwright Test Results
+          path: results/junit.xml # Assumes your JUnit reporter output path
+          reporter: jest-junit
+          fail-on-error: true # Fails the reporter step if XML is invalid
+          
+      # --- HTML Report: Prepare for GitHub Pages Deployment ---
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload HTML Report artifact
+        uses: actions/upload-pages-artifact@v3
+        if: always() # Run regardless of test result
+        with:
+          # This must match the output directory of Playwright's HTML reporter
+          path: 'playwright-report' 
+
   deploy:
+    # This job only runs if the 'build' job succeeded
+    needs: build 
+    runs-on: ubuntu-latest
+    
+    # Define the deployment environment
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+      
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Upload entire repository
-          path: '.'
+      # --- Deploy to GitHub Pages ---
+      # This step takes the uploaded artifact and publishes it as your GitHub Page.
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
