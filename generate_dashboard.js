@@ -44,11 +44,14 @@ function updateHistory(newResult) {
 
     // Use optional chaining for safety, but we rely on the report having stats.
     const stats = newResult?.stats;
-    
+    console.log("Raw stats block:", stats);
+
     // Check if new data is valid (only update history if stats exist)
     if (!stats || typeof stats.total !== 'number') {
-        console.warn("WARNING: New Playwright report 'stats' block is invalid or missing total count. Skipping update of history with new run.");
-        return history; // Return existing history without adding a bad entry
+      const fallback = newResult?.suites?.[0]?.stats;
+      if (fallback && typeof fallback.total === 'number') {
+        newResult.stats = fallback;
+      }
     }
 
     const timestamp = new Date().toISOString();
