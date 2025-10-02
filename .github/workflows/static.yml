@@ -16,16 +16,21 @@ permissions:
   pages: write        # To deploy to GitHub Pages
   id-token: write     # For authentication required by deploy-pages action
 
+
 jobs:
   build_and_test:
     name: Build & Run Tests
     runs-on: ubuntu-latest
     permissions:
-      contents: write 
+      contents: write # REQUIRED to commit report_history.json
       checks: write
     steps:
+      # 1. Checkout Code - IMPORTANT: Must fetch history
       - name: Checkout repository code
         uses: actions/checkout@v4
+        with:
+          # Ensure you fetch the full history, not just the current commit
+          fetch-depth: 0 
 
       # Setup Environment
       - name: Set up Node.js
@@ -52,13 +57,22 @@ jobs:
           reporter: jest-junit
           fail-on-error: true
           
-      # 💡 NEW STEP: Generate Custom Dashboard
+      # Generate Custom Dashboard (Updates report_history.json)
       - name: Generate Historical Dashboard HTML
         run: node generate_dashboard.js
         env:
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
+          
+      # 💡 CRITICAL STEP: Commit the updated history file back to the repo
+      - name: Commit Historical Report File
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'CI: Update test run history [skip ci]'
+          # Only commit the history file and the folder containing the history
+          files: 'dashboard-output/report_history.json' 
+          branch: ${{ github.ref_name }} # Commits to the current branch (e.g., main)
           
       # Setup for Pages deployment
       - name: Setup Pages
@@ -68,5 +82,4 @@ jobs:
       - name: Upload Custom Dashboard Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # CRITICAL: Deploy the custom dashboard folder
           path: dashboard-output/
