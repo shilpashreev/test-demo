@@ -42,44 +42,31 @@ function updateHistory(newResult) {
         console.log("[HISTORY] History file NOT FOUND. Starting with 0 historical entries.");
     }
 
+    // Use optional chaining for safety, but we rely on the report having stats.
+    const stats = newResult?.stats;
+    console.log("Raw stats block:", stats);
 
-    // ----------------------------------------------------
-    // 💡 CRITICAL FIX: Robustly locate stats object
-    // ----------------------------------------------------
-    
-    // 1. Locate the correct statistics object from the new report
-    let stats = newResult?.stats;
-
-    // Fallback logic for reports where stats are nested deeper (a common Playwright report format)
+    // Check if new data is valid (only update history if stats exist)
     if (!stats || typeof stats.total !== 'number') {
-        stats = newResult?.suites?.[0]?.stats;
+      const fallback = newResult?.suites?.[0]?.stats;
+      if (fallback && typeof fallback.total === 'number') {
+        newResult.stats = fallback;
+      }
     }
-
-    // 2. Final guarantee: If stats are still invalid, create a zeroed-out fallback
-    if (!stats || typeof stats.total !== 'number') {
-        stats = { total: 0, passed: 0, failed: 0, skipped: 0, duration: 0 };
-        console.warn("Could not find valid test statistics in the JSON report. Using zeros for the current run.");
-    }
-
-    console.log("Guaranteed stats block:", stats);
 
     const timestamp = new Date().toISOString();
     const today = timestamp.split('T')[0];
-        
-    // 3. Create the new history entry using the now-guaranteed 'stats' object
+    
+    // Use || 0 to ensure all metrics are numbers, even if Playwright missed one
     const newRun = {
         timestamp,
         date: today,
-        // Since 'stats' is guaranteed to exist with numerical properties, we use them directly
-        total: stats.total, 
-        passed: stats.passed, 
-        failed: stats.failed, 
-        skipped: stats.skipped, 
-        duration: Math.round((stats.duration || 0) / 1000 / 60) // duration is in milliseconds, convert to minutes
+        total: stats.total || 0,
+        passed: stats.passed || 0,
+        failed: stats.failed || 0,
+        skipped: stats.skipped || 0,
+        duration: Math.round((stats.duration || 0) / 1000 / 60) // minutes
     };
-    // ----------------------------------------------------
-    // 💡 END CRITICAL FIX
-    // ----------------------------------------------------
 
     // Update or add the current run (to only keep one per day)
     const existingIndex = history.findIndex(run => run.date === today);
@@ -116,7 +103,7 @@ function generateDashboard(history) {
         skipped: lastRun.skipped || 0
     } : { total: 0, passed: 0, failed: 0, skipped: 0 };
     
-    // The HTML content 
+    // The HTML content (omitted for brevity, assume correct)
     const html = `
 <!DOCTYPE html>
 <html>
