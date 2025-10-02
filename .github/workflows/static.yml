@@ -93,6 +93,17 @@ jobs:
       # --- 8. Custom Dashboard Generation ---
       - name: Generate Historical Dashboard HTML
         run: node generate_dashboard.js
+      - name: Verify Dashboard Files Were Created
+        run: |
+          echo "Listing contents of the deployment directory:"
+          ls -l dashboard-output/
+          
+          if [ -f dashboard-output/index.html ]; then
+            echo "✅ index.html FOUND! Deployment should work."
+          else
+            echo "❌ index.html NOT FOUND. The Node.js script failed or wrote the file elsewhere."
+            exit 1 # Fail the job if the file is missing
+          fi
 
       # --- 9. Deploy Dashboard to gh-pages ---
       - name: Deploy Dashboard with History
