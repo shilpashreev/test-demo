@@ -51,33 +51,35 @@
         const currentSkipped = 0;
 
         // Bar Chart (Trend)
-        new Chart(document.getElementById('barChart'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
-                    { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: { x: { stacked: true }, y: { stacked: true } }
-            }
-        });
+        if (labels.length > 0) { // Check data exists before trying to draw
+            new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
+                        { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: { x: { stacked: true }, y: { stacked: true } }
+                }
+            });
 
-        // Pie Chart (Latest Run Breakdown)
-        new Chart(document.getElementById('pieChart'), {
-            type: 'pie',
-            data: {
-                labels: ['Passed', 'Failed', 'Skipped'],
-                datasets: [{
-                    data: [currentPassed, currentFailed, currentSkipped],
-                    backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
-                }]
-            },
-            options: { responsive: true }
-        });
+            // Pie Chart (Latest Run Breakdown)
+            new Chart(document.getElementById('pieChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['Passed', 'Failed', 'Skipped'],
+                    datasets: [{
+                        data: [currentPassed, currentFailed, currentSkipped],
+                        backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
+                    }]
+                },
+                options: { responsive: true }
+            });
+        }
     </script>
 </body>
 </html>
