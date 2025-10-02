@@ -15,7 +15,6 @@ function updateHistory(newResult) {
 
     console.log(`[HISTORY] Looking for history file at: ${historyFilePath}`);
     
-    // Check for history file (this is needed for subsequent runs)
     if (fs.existsSync(historyFilePath)) {
         console.log("[HISTORY] History file FOUND. Attempting to load...");
         try {
@@ -28,24 +27,25 @@ function updateHistory(newResult) {
         console.log("[HISTORY] History file NOT FOUND. Starting with 0 historical entries.");
     }
 
-    // Safely extract stats, checking if the fields exist in the report.json
+    // Use optional chaining for safety, but we rely on the report having stats.
     const stats = newResult?.stats;
-    if (!stats || stats.total === 0) {
-        console.error("Error: New result data is empty or missing 'stats' block. Skipping history update.");
+    if (!stats || typeof stats.total !== 'number') {
+        console.error("Error: Playwright report 'stats' block is invalid or missing total count. Skipping history update.");
         return history; // Return existing history without adding a bad entry
     }
 
     const timestamp = new Date().toISOString();
     const today = timestamp.split('T')[0];
     
+    // Use || 0 to ensure all metrics are numbers, even if Playwright missed one
     const newRun = {
         timestamp,
         date: today,
-        total: stats.total,
-        passed: stats.passed,
-        failed: stats.failed,
-        skipped: stats.skipped,
-        duration: Math.round(stats.duration / 1000 / 60) // minutes
+        total: stats.total || 0,
+        passed: stats.passed || 0,
+        failed: stats.failed || 0,
+        skipped: stats.skipped || 0,
+        duration: Math.round((stats.duration || 0) / 1000 / 60) // minutes
     };
 
     // Update or add the current run (to only keep one per day)
@@ -70,11 +70,20 @@ function updateHistory(newResult) {
 // --- 2. Generate Dashboard HTML ---
 function generateDashboard(history) {
     const labels = history.map(run => run.date);
-    const passedData = history.map(run => run.passed);
-    const failedData = history.map(run => run.failed);
-    const currentStats = history[history.length - 1] || { total: 0, passed: 0, failed: 0, skipped: 0 };
+    // FIX 1: Use || 0 to replace any null/undefined in the trend data arrays
+    const passedData = history.map(run => run.passed || 0);
+    const failedData = history.map(run => run.failed || 0);
+
+    // FIX 2: Ensure currentStats always has numbers, using the last entry or default 0
+    const lastRun = history[history.length - 1];
+    const currentStats = lastRun ? {
+        total: lastRun.total || 0,
+        passed: lastRun.passed || 0,
+        failed: lastRun.failed || 0,
+        skipped: lastRun.skipped || 0
+    } : { total: 0, passed: 0, failed: 0, skipped: 0 };
     
-    // The HTML content (using the template literal is correct)
+    // The HTML content
     const html = `
 <!DOCTYPE html>
 <html>
@@ -128,7 +137,7 @@ function generateDashboard(history) {
         const currentSkipped = ${currentStats.skipped};
 
         // Bar Chart (Trend)
-        if (labels.length > 0) { // Check data exists before trying to draw
+        if (labels.length > 0) {
             new Chart(document.getElementById('barChart'), {
                 type: 'bar',
                 data: {
@@ -165,12 +174,11 @@ function generateDashboard(history) {
     console.log('Dashboard HTML generated successfully in ' + REPORTS_DIR);
 }
 
-// --- 3. Main Execution (THE CRITICAL PATH CHECK) ---
+// --- 3. Main Execution ---
 try {
-    // 🔑 FATAL FIX: Check for the Playwright output file before proceeding.
+    // Check for the Playwright output file before proceeding.
     if (!fs.existsSync(JSON_REPORT_PATH)) {
         console.error(`ERROR: Playwright report file not found at ${JSON_REPORT_PATH}. Aborting dashboard generation.`);
-        // If the report doesn't exist, we can't get current stats, so we stop.
         process.exit(1); 
     }
     
@@ -184,7 +192,7 @@ try {
 
     const updatedHistory = updateHistory(newResult);
     
-    // Only try to generate the dashboard if we have any history (at least 1 run)
+    // Only try to generate the dashboard if we have any valid history
     if (updatedHistory.length > 0) {
         generateDashboard(updatedHistory);
     } else {
