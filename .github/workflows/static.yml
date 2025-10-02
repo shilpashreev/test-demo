@@ -17,7 +17,7 @@ permissions:
 jobs:
   build_and_report:
     runs-on: ubuntu-latest
-    # Re-declare permissions here to ensure the job token has the necessary access
+    # Re-declare permissions to ensure the job token has the necessary access
     permissions:
       contents: write
       checks: write
@@ -27,13 +27,20 @@ jobs:
       - name: Checkout main repository code
         uses: actions/checkout@v4
         
-      # --- 2. Download Previous History ---
-      # Downloads the gh-pages branch into a separate folder to preserve history
-      - name: Download Previous Dashboard History
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: gh-pages-temp 
+      # --- 2. Robust Download Previous History (FIXED) ---
+      # This step fetches the gh-pages branch only if it exists, preventing failure on the first run.
+      - name: Download Previous Dashboard History (Robust)
+        run: |
+          # Check if the gh-pages branch exists on the remote
+          if git fetch origin gh-pages; then
+            echo "gh-pages branch found. Checking out history."
+            # Check out content from gh-pages branch's HEAD into gh-pages-temp
+            git checkout gh-pages
+            mkdir -p gh-pages-temp
+            git --work-tree=gh-pages-temp checkout gh-pages -- .
+          else
+            echo "gh-pages branch not found. Proceeding without history (first run)."
+          fi
 
       # --- 3. Setup Environment ---
       - name: Set up Node.js
@@ -53,33 +60,34 @@ jobs:
           mkdir dashboard-output
           # Copy the history file from the gh-pages branch into the output folder
           if [ -f gh-pages-temp/report_history.json ]; then
+            echo "Copying history file."
             cp gh-pages-temp/report_history.json dashboard-output/
+          else
+            echo "No history file found. Starting new history."
           fi
           
       # --- 5. Test Execution and Report Generation ---
       - name: Run Playwright tests and generate JSON/JUnit reports
-        # This command creates results/junit.xml and results/report.json
+        # The '|| true' ensures the workflow continues even if tests fail
         run: npx playwright test || true
         
-      # --- 6. Debug: Verify JUnit File Exists (Optional) ---
+      # --- 6. Debug: Verify JUnit File Exists ---
       - name: Verify JUnit File Exists
         run: ls -l results/junit.xml
-          
+        
       # --- 7. Publish JUnit Summary Report (To GitHub Check Runs) ---
       - name: Publish JUnit XML Report
         uses: dorny/test-reporter@v1
         if: always()
         with:
           name: Playwright Test Results
-          # This path must match the output in your playwright.config.js
           path: results/junit.xml 
           reporter: jest-junit
           fail-on-error: true
           
       # --- 8. Custom Dashboard Generation ---
       - name: Generate Historical Dashboard HTML
-        # The script reads the new JSON, updates the history file, 
-        # and creates index.html with charts in dashboard-output/
+        # This script (generate_dashboard.js) reads the new JSON and updates the history.json
         run: node generate_dashboard.js
 
       # --- 9. Deploy Dashboard to gh-pages ---
