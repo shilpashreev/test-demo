@@ -20,6 +20,9 @@ jobs:
   build_and_test:
     name: Build & Run Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+      checks: write #
     steps:
       # 1. Checkout Code
       - name: Checkout repository code
