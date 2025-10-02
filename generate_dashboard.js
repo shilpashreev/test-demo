@@ -13,21 +13,22 @@ function updateHistory(newResult) {
     let history = [];
     const historyFilePath = path.join(REPORTS_DIR, HISTORY_FILE);
 
-    console.log(`[DEBUG] Looking for history file at: ${historyFilePath}`); // 🔑 NEW DEBUG LINE 1
-
+    console.log(`[DEBUG] Looking for history file at: ${historyFilePath}`);
+    
+    // Check for history file
     if (fs.existsSync(historyFilePath)) {
-        console.log("[DEBUG] History file FOUND. Attempting to load..."); // 🔑 NEW DEBUG LINE 2
+        console.log("[DEBUG] History file FOUND. Attempting to load...");
         try {
             history = JSON.parse(fs.readFileSync(historyFilePath, 'utf8'));
-            console.log(`[DEBUG] Successfully loaded ${history.length} historical entries.`); // 🔑 NEW DEBUG LINE 3
+            console.log(`[DEBUG] Successfully loaded ${history.length} historical entries.`);
         } catch (e) {
             console.error("Error reading history file, starting fresh:", e.message);
         }
     } else {
-        console.log("[DEBUG] History file NOT FOUND. Starting with 0 historical entries."); // 🔑 NEW DEBUG LINE 4
+        // This is expected if it's the first run, or if the YAML copy step failed.
+        console.log("[DEBUG] History file NOT FOUND. Starting with 0 historical entries.");
     }
 
-    // ... (rest of the history update logic is correct)
     const timestamp = new Date().toISOString();
     const today = timestamp.split('T')[0];
     const totalTests = newResult.stats.total;
@@ -46,7 +47,7 @@ function updateHistory(newResult) {
         duration: Math.round(duration / 1000 / 60) // minutes
     };
 
-    // Only keep one entry per day for a cleaner chart (optional)
+    // Update or add the current run
     const existingIndex = history.findIndex(run => run.date === today);
     if (existingIndex !== -1) {
         history[existingIndex] = newRun;
@@ -61,103 +62,118 @@ function updateHistory(newResult) {
     
     fs.writeFileSync(historyFilePath, JSON.stringify(history, null, 2));
     
-    console.log(`[DEBUG] Final history array size after update: ${history.length}`); // 🔑 NEW DEBUG LINE 5
+    console.log(`[DEBUG] Final history array size after update: ${history.length}`);
     return history;
 }
 
-// --- 2. Generate Dashboard HTML (No changes needed here) ---
-// --- 2. Generate Dashboard HTML (CORRECTED) ---
+// --- 2. Generate Dashboard HTML ---
 function generateDashboard(history) {
-  const labels = history.map(run => run.date);
-  const passedData = history.map(run => run.passed);
-  const failedData = history.map(run => run.failed);
-  const currentStats = history[history.length - 1] || { total: 0, passed: 0, failed: 0, skipped: 0 };
-  
-  // 🔑 FATAL FIX: The 'html' variable MUST be defined here
-  const html = `
+    const labels = history.map(run => run.date);
+    const passedData = history.map(run => run.passed);
+    const failedData = history.map(run => run.failed);
+    const currentStats = history[history.length - 1] || { total: 0, passed: 0, failed: 0, skipped: 0 };
+    
+    const html = `
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Playwright Test Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-  <style>
-      body { font-family: Arial, sans-serif; padding: 20px; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-      .stats { margin-bottom: 30px; }
-      h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
-      .stat-box { 
-        padding: 15px; 
-        border-radius: 5px; 
-        display: inline-block; 
-        margin-right: 15px; 
-        color: white; 
-      }
-      .passed { background-color: #4CAF50; }
-      .failed { background-color: #F44336; }
-      .total { background-color: #2196F3; }
-  </style>
+    <title>Playwright Test Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        .stats { margin-bottom: 30px; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .stat-box { 
+          padding: 15px; 
+          border-radius: 5px; 
+          display: inline-block; 
+          margin-right: 15px; 
+          color: white; 
+        }
+        .passed { background-color: #4CAF50; }
+        .failed { background-color: #F44336; }
+        .total { background-color: #2196F3; }
+    </style>
 </head>
 <body>
-  <h1>Playwright Test Dashboard (Last ${MAX_HISTORY_DAYS} Days)</h1>
+    <h1>Playwright Test Dashboard (Last ${MAX_HISTORY_DAYS} Days)</h1>
 
-  <div class="stats">
-      <div class="stat-box total">Total Tests: ${currentStats.total}</div>
-      <div class="stat-box passed">Passed: ${currentStats.passed}</div>
-      <div class="stat-box failed">Failed: ${currentStats.failed}</div>
-  </div>
+    <div class="stats">
+        <div class="stat-box total">Total Tests: ${currentStats.total}</div>
+        <div class="stat-box passed">Passed: ${currentStats.passed}</div>
+        <div class="stat-box failed">Failed: ${currentStats.failed}</div>
+    </div>
 
-  <div class="grid">
-      <div class="chart-container">
-          <h2>Pass/Fail Trend (Bar Chart)</h2>
-          <canvas id="barChart"></canvas>
-      </div>
-      <div class="chart-container">
-          <h2>Latest Run Status (Pie Chart)</h2>
-          <canvas id="pieChart"></canvas>
-      </div>
-  </div>
+    <div class="grid">
+        <div class="chart-container">
+            <h2>Pass/Fail Trend (Bar Chart)</h2>
+            <canvas id="barChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h2>Latest Run Status (Pie Chart)</h2>
+            <canvas id="pieChart"></canvas>
+        </div>
+    </div>
 
-  <script>
-      // Data from the script execution
-      const labels = ${JSON.stringify(labels)};
-      const passedData = ${JSON.stringify(passedData)};
-      const failedData = ${JSON.stringify(failedData)};
-      const currentPassed = ${currentStats.passed};
-      const currentFailed = ${currentStats.failed};
-      const currentSkipped = ${currentStats.skipped};
+    <script>
+        // Data from the script execution
+        const labels = ${JSON.stringify(labels)};
+        const passedData = ${JSON.stringify(passedData)};
+        const failedData = ${JSON.stringify(failedData)};
+        const currentPassed = ${currentStats.passed};
+        const currentFailed = ${currentStats.failed};
+        const currentSkipped = ${currentStats.skipped};
 
-      // Bar Chart (Trend)
-      new Chart(document.getElementById('barChart'), {
-          type: 'bar',
-          data: {
-              labels: labels,
-              datasets: [
-                  { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
-                  { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
-              ]
-          },
-          options: {
-              responsive: true,
-              scales: { x: { stacked: true }, y: { stacked: true } }
-          }
-      });
+        // Bar Chart (Trend)
+        new Chart(document.getElementById('barChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
+                    { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: { x: { stacked: true }, y: { stacked: true } }
+            }
+        });
 
-      // Pie Chart (Latest Run Breakdown)
-      new Chart(document.getElementById('pieChart'), {
-          type: 'pie',
-          data: {
-              labels: ['Passed', 'Failed', 'Skipped'],
-              datasets: [{
-                  data: [currentPassed, currentFailed, currentSkipped],
-                  backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
-              }]
-          },
-          options: { responsive: true }
-      });
-  </script>
+        // Pie Chart (Latest Run Breakdown)
+        new Chart(document.getElementById('pieChart'), {
+            type: 'pie',
+            data: {
+                labels: ['Passed', 'Failed', 'Skipped'],
+                datasets: [{
+                    data: [currentPassed, currentFailed, currentSkipped],
+                    backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
+                }]
+            },
+            options: { responsive: true }
+        });
+    </script>
 </body>
 </html>
 `;
-  fs.writeFileSync(path.join(REPORTS_DIR, 'index.html'), html);
-  console.log('Dashboard HTML generated successfully in ' + REPORTS_DIR);
+    fs.writeFileSync(path.join(REPORTS_DIR, 'index.html'), html);
+    console.log('Dashboard HTML generated successfully in ' + REPORTS_DIR);
+}
+
+// --- Main Execution ---
+try {
+    const rawData = fs.readFileSync(JSON_REPORT_PATH, 'utf8');
+    const newResult = JSON.parse(rawData);
+
+    // Create output directory if it doesn't exist
+    if (!fs.existsSync(REPORTS_DIR)) {
+        fs.mkdirSync(REPORTS_DIR);
+    }
+
+    const updatedHistory = updateHistory(newResult);
+    generateDashboard(updatedHistory);
+} catch (error) {
+    console.error('Failed to generate dashboard:', error.message);
+    process.exit(1);
 }
