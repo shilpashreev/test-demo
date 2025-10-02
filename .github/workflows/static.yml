@@ -4,24 +4,38 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
+# Grant top-level permissions required for the entire workflow
 permissions:
-  contents: write    # Required for peaceiris to commit to gh-pages
-  checks: write      # Required for dorny/test-reporter
+  contents: write    # Required for peaceiris/actions-gh-pages to commit to gh-pages
+  checks: write      # Required for dorny/test-reporter to create check runs
 
 jobs:
   build_and_report:
     runs-on: ubuntu-latest
+    # Re-declare permissions here to ensure the job token has the necessary access
     permissions:
       contents: write
       checks: write
       
     steps:
-      - name: Checkout repository
+      # --- 1. Checkout Main Branch Code ---
+      - name: Checkout main repository code
         uses: actions/checkout@v4
-      
-      # --- Setup ---
+        
+      # --- 2. Download Previous History ---
+      # Downloads the gh-pages branch into a separate folder to preserve history
+      - name: Download Previous Dashboard History
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-temp 
+
+      # --- 3. Setup Environment ---
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -32,46 +46,46 @@ jobs:
           npm ci
           npx playwright install --with-deps
           
-      # --- Get Previous History (Required for Aggregation) ---
-      - name: Download Previous Dashboard History
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages # Checkout the gh-pages branch
-          path: gh-pages-temp
-          
-      # --- Create Dashboard Directory & Copy History ---
+      # --- 4. Prepare Dashboard Directory & Copy History ---
       - name: Prepare Dashboard Directory
         run: |
+          # Create the final output folder
           mkdir dashboard-output
-          # Copy history file from gh-pages branch if it exists
+          # Copy the history file from the gh-pages branch into the output folder
           if [ -f gh-pages-temp/report_history.json ]; then
             cp gh-pages-temp/report_history.json dashboard-output/
           fi
           
-      # --- Test Execution ---
-      - name: Run Playwright tests and generate JSON report
+      # --- 5. Test Execution and Report Generation ---
+      - name: Run Playwright tests and generate JSON/JUnit reports
+        # This command creates results/junit.xml and results/report.json
         run: npx playwright test || true
         
-      # --- Custom Dashboard Generation ---
-      - name: Generate Historical Dashboard HTML
-        # The script reads the new JSON, updates the history file, 
-        # and creates index.html with charts in dashboard-output/
-        run: node generate_dashboard.js
-
-      # --- JUnit Report: Show Summary ---
+      # --- 6. Debug: Verify JUnit File Exists (Optional) ---
+      - name: Verify JUnit File Exists
+        run: ls -l results/junit.xml
+          
+      # --- 7. Publish JUnit Summary Report (To GitHub Check Runs) ---
       - name: Publish JUnit XML Report
         uses: dorny/test-reporter@v1
         if: always()
         with:
           name: Playwright Test Results
-          path: results/junit.xml
+          # This path must match the output in your playwright.config.js
+          path: results/junit.xml 
           reporter: jest-junit
           fail-on-error: true
           
-      # --- Deploy Dashboard to gh-pages ---
+      # --- 8. Custom Dashboard Generation ---
+      - name: Generate Historical Dashboard HTML
+        # The script reads the new JSON, updates the history file, 
+        # and creates index.html with charts in dashboard-output/
+        run: node generate_dashboard.js
+
+      # --- 9. Deploy Dashboard to gh-pages ---
       - name: Deploy Dashboard with History
         uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # The directory containing index.html and the history JSON
