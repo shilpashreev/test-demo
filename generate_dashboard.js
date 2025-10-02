@@ -191,38 +191,47 @@ function generateDashboard(history) {
     console.log('Dashboard HTML generated successfully in ' + REPORTS_DIR);
 }
 
-// --- 3. Main Execution (THE CRASH PREVENTION FIX) ---
+
+
+// --- 3. Main Execution (FINAL CRASH PREVENTION) ---
+let newResult = {}; // Initialize to empty object for safety
+let updatedHistory = []; // Initialize history array
+
 try {
-    let newResult = {}; // Initialize to empty object for safety
-    
-    // 🔑 FIX: Check for the Playwright output file without immediately crashing.
+    // 1. Try to read the Playwright report
     if (fs.existsSync(JSON_REPORT_PATH)) {
         const rawData = fs.readFileSync(JSON_REPORT_PATH, 'utf8');
         newResult = JSON.parse(rawData);
     } else {
-        // Log a warning, but don't crash the job. This ensures index.html is written.
         console.warn(`WARNING: Playwright report file not found at ${JSON_REPORT_PATH}. Generating dashboard using ONLY existing history.`);
     }
 
-    // Create output directory if it doesn't exist
+    // 2. Ensure output directory exists
     if (!fs.existsSync(REPORTS_DIR)) {
         fs.mkdirSync(REPORTS_DIR);
     }
-
-    // Pass newResult (which may be {} if report was missing) to updateHistory
-    const updatedHistory = updateHistory(newResult);
     
-    // Only try to generate the dashboard if we have any valid history
+    // 3. Update history (this handles missing stats/empty newResult safely)
+    updatedHistory = updateHistory(newResult);
+    
+    // 4. CRITICAL: Always call generateDashboard if history was loaded or created.
     if (updatedHistory.length > 0) {
         generateDashboard(updatedHistory);
     } else {
-        // If it's truly the first run and report is missing, dashboard cannot be generated.
-        console.log("No valid test runs found to generate dashboard.");
+        // FALLBACK: If history is empty, create a dummy dashboard to prevent crash
+        console.warn("CRITICAL FALLBACK: History is empty. Creating a dummy index.html to prevent CI crash.");
+        generateDashboard([]); 
     }
     
 } catch (error) {
-    console.error('Failed to generate dashboard due to unexpected error:', error.message);
-    // CRITICAL: We still exit with 1 on UNEXPECTED errors (like file system failure), 
-    // but not on missing Playwright report (which is handled above).
+    console.error('FATAL CRASH: Failed to generate dashboard due to unexpected error:', error.message);
+    // CRITICAL FIX: If we crash, try to write the blank dashboard one last time
+    try {
+        generateDashboard([]);
+        console.log("Successfully created blank index.html during crash recovery.");
+    } catch(e) {
+        console.error("Crash recovery failed:", e.message);
+    }
+    
     process.exit(1);
 }
