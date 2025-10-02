@@ -1,5 +1,5 @@
-name: Playwright Tests & Dashboard History1
 
+name: Playwright Tests & Dashboard History
 
 on:
   push:
@@ -28,22 +28,24 @@ jobs:
       - name: Checkout main repository code
         uses: actions/checkout@v4
         
-      # --- 2. Robust Download Previous History (FIXED) ---
-      # This step fetches the gh-pages branch only if it exists, preventing failure on the first run.
+      # --- 2. Robust Download Previous History (CRITICALLY FIXED) ---
+      # Safely extracts the history file without changing the working branch.
       - name: Download Previous Dashboard History (Robust)
         run: |
-          # Check if the gh-pages branch exists on the remote
-          if git fetch origin gh-pages; then
-            echo "gh-pages branch found. Checking out history."
-            # Check out content from gh-pages branch's HEAD into gh-pages-temp
-            git checkout gh-pages
+          # Fetch the gh-pages branch without switching the working branch
+          git fetch origin gh-pages || echo "gh-pages branch not found (First run)."
+          
+          # Use git show to extract the history file from gh-pages into the temp folder
+          if [ -d .git/refs/remotes/origin/gh-pages ]; then
+            echo "gh-pages branch found. Copying report_history.json directly."
             mkdir -p gh-pages-temp
-            git --work-tree=gh-pages-temp checkout gh-pages -- .
+            # This pulls the file from the remote branch's history
+            git show origin/gh-pages:dashboard-output/report_history.json > gh-pages-temp/report_history.json || echo "report_history.json not found in gh-pages."
           else
-            echo "gh-pages branch not found. Proceeding without history (first run)."
+            echo "Proceeding without history."
           fi
 
-      # --- 3. Setup Environment ---
+      # --- 3. Setup Environment (FIXED: Uses npm install to avoid lockfile errors) ---
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -51,18 +53,20 @@ jobs:
       
       - name: Install dependencies and browsers
         run: |
-          npm install
+          npm install # Fixed: Use install instead of ci to ensure dependencies are resolved.
           npx playwright install --with-deps
           
       # --- 4. Prepare Dashboard Directory & Copy History ---
       - name: Prepare Dashboard Directory
         run: |
           # Create the final output folder
-          mkdir dashboard-output
-          # Copy the history file from the gh-pages branch into the output folder
+          mkdir -p dashboard-output
+          # Copy the history file from the temp folder (whether it came from gh-pages or local)
           if [ -f gh-pages-temp/report_history.json ]; then
-            echo "Copying history file."
+            echo "Copying history file from gh-pages into dashboard-output."
             cp gh-pages-temp/report_history.json dashboard-output/
+          elif [ -f dashboard-output/report_history.json ]; then
+            echo "History file already prepared locally."
           else
             echo "No history file found. Starting new history."
           fi
@@ -88,12 +92,12 @@ jobs:
           
       # --- 8. Custom Dashboard Generation ---
       - name: Generate Historical Dashboard HTML
-        # This script (generate_dashboard.js) reads the new JSON and updates the history.json
         run: node generate_dashboard.js
 
       # --- 9. Deploy Dashboard to gh-pages ---
       - name: Deploy Dashboard with History
         uses: peaceiris/actions-gh-pages@v4
+        # Only run this step on the main branch
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
