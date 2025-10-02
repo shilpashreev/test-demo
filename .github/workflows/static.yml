@@ -75,7 +75,7 @@ jobs:
           branch: ${{ github.ref_name }} # Commits to the current branch (e.g., main)
           
       # Setup for Pages deployment
-      - name: Setup Pages
+      - name: Setup Pages1
         uses: actions/configure-pages@v5
         
       # Upload Custom Dashboard Artifact
