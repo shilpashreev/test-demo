@@ -1,4 +1,3 @@
-
 name: Playwright Tests & Dashboard History
 
 on:
@@ -10,15 +9,13 @@ on:
       - main
   workflow_dispatch:
 
-# Grant top-level permissions required for the entire workflow
 permissions:
-  contents: write    # Required for peaceiris/actions-gh-pages to commit to gh-pages
-  checks: write      # Required for dorny/test-reporter to create check runs
+  contents: write
+  checks: write
 
 jobs:
   build_and_report:
     runs-on: ubuntu-latest
-    # Re-declare permissions to ensure the job token has the necessary access
     permissions:
       contents: write
       checks: write
@@ -28,24 +25,21 @@ jobs:
       - name: Checkout main repository code
         uses: actions/checkout@v4
         
-      # --- 2. Robust Download Previous History (CRITICALLY FIXED) ---
-      # Safely extracts the history file without changing the working branch.
+      # --- 2. Robust Download Previous History (FINAL FIX) ---
       - name: Download Previous Dashboard History (Robust)
         run: |
-          # Fetch the gh-pages branch without switching the working branch
           git fetch origin gh-pages || echo "gh-pages branch not found (First run)."
           
-          # Use git show to extract the history file from gh-pages into the temp folder
           if [ -d .git/refs/remotes/origin/gh-pages ]; then
-            echo "gh-pages branch found. Copying report_history.json directly."
+            echo "gh-pages branch found. Attempting to retrieve report_history.json from remote root."
             mkdir -p gh-pages-temp
-            # This pulls the file from the remote branch's history
-            git show origin/gh-pages:dashboard-output/report_history.json > gh-pages-temp/report_history.json || echo "report_history.json not found in gh-pages."
+            # Using the corrected path: remote_branch:filename
+            git show origin/gh-pages:report_history.json > gh-pages-temp/report_history.json || echo "report_history.json not found in gh-pages root."
           else
             echo "Proceeding without history."
           fi
 
-      # --- 3. Setup Environment (FIXED: Uses npm install to avoid lockfile errors) ---
+      # --- 3. Setup Environment ---
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -53,15 +47,14 @@ jobs:
       
       - name: Install dependencies and browsers
         run: |
-          npm install # Fixed: Use install instead of ci to ensure dependencies are resolved.
+          npm install 
           npx playwright install --with-deps
           
       # --- 4. Prepare Dashboard Directory & Copy History ---
       - name: Prepare Dashboard Directory
         run: |
-          # Create the final output folder
           mkdir -p dashboard-output
-          # Copy the history file from the temp folder (whether it came from gh-pages or local)
+          # Copy history file from temp location into the processing location
           if [ -f gh-pages-temp/report_history.json ]; then
             echo "Copying history file from gh-pages into dashboard-output."
             cp gh-pages-temp/report_history.json dashboard-output/
@@ -73,10 +66,9 @@ jobs:
           
       # --- 5. Test Execution and Report Generation ---
       - name: Run Playwright tests and generate JSON/JUnit reports
-        # The '|| true' ensures the workflow continues even if tests fail
         run: npx playwright test || true
         
-      # --- 6. Debug: Verify JUnit File Exists ---
+      # --- 6. Verify JUnit File Exists ---
       - name: Verify JUnit File Exists
         run: ls -l results/junit.xml
         
@@ -90,9 +82,10 @@ jobs:
           reporter: jest-junit
           fail-on-error: true
           
-      # --- 8. Custom Dashboard Generation ---
+      # --- 8. Custom Dashboard Generation & Verification ---
       - name: Generate Historical Dashboard HTML
         run: node generate_dashboard.js
+        
       - name: Verify Dashboard Files Were Created
         run: |
           echo "Listing contents of the deployment directory:"
@@ -102,18 +95,15 @@ jobs:
             echo "✅ index.html FOUND! Deployment should work."
           else
             echo "❌ index.html NOT FOUND. The Node.js script failed or wrote the file elsewhere."
-            exit 1 # Fail the job if the file is missing
+            exit 1 
           fi
 
       # --- 9. Deploy Dashboard to gh-pages ---
       - name: Deploy Dashboard with History
         uses: peaceiris/actions-gh-pages@v4
-        # Only run this step on the main branch
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # The directory containing index.html and the history JSON
           publish_dir: ./dashboard-output 
           publish_branch: gh-pages
-          # Overwrite the root of the gh-pages branch with the new dashboard
           destination_dir: .
