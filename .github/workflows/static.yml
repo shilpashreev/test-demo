@@ -22,13 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write 
-      checks: write #
+      checks: write
     steps:
-      # 1. Checkout Code
       - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # 2. Setup Environment
+      # Setup Environment
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -39,44 +38,35 @@ jobs:
           npm install 
           npx playwright install --with-deps
           
-      # 3. Run Tests
+      # Run Tests and Generate JSON report
       - name: Run Playwright tests
-        # Use '|| true' to ensure the workflow proceeds and publishes the report 
-        # even if some tests fail.
         run: npx playwright test || true
       
-      # 4. (Optional) Publish JUnit Summary to Check Runs
-      # This step provides the status summary visible on the Pull Request checks tab.
+      # Publish JUnit Summary (Optional)
       - name: Publish JUnit XML Report to Checks
         uses: dorny/test-reporter@v1
         if: always()
         with:
           name: Playwright Test Results
-          path: results/junit.xml # Path used in your config.js
+          path: results/junit.xml
           reporter: jest-junit
-          fail-on-error: true # Fails the Check Run, but not the job (due to 'if: always()')
+          fail-on-error: true
           
-      # 5. Setup Pages Action (Prepares the environment for deployment)
+      # 💡 NEW STEP: Generate Custom Dashboard
+      - name: Generate Historical Dashboard HTML
+        run: node generate_dashboard.js
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          
+      # Setup for Pages deployment
       - name: Setup Pages
         uses: actions/configure-pages@v5
         
-      # 6. Upload Report Artifact (Zips and stages the Playwright HTML folder)
-      - name: Upload Playwright Report Artifact
+      # Upload Custom Dashboard Artifact
+      - name: Upload Custom Dashboard Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Playwright's default HTML output folder
-          path: playwright-report/ 
-
-  # 7. Deployment Job
-  deploy:
-    name: Deploy Report
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    # This job only runs if the build_and_test job completes successfully
-    needs: build_and_test
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          # CRITICAL: Deploy the custom dashboard folder
+          path: dashboard-output/

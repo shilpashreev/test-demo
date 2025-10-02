@@ -6,8 +6,14 @@ const path = require('path');
 const HISTORY_FILE = 'report_history.json';
 const MAX_HISTORY_DAYS = 15;
 const REPORTS_DIR = 'dashboard-output';
-// Playwright config confirms this path:
 const JSON_REPORT_PATH = 'results/report.json'; 
+
+// Environment variables passed from GitHub Actions
+const { 
+    GITHUB_RUN_ID, 
+    GITHUB_REPOSITORY, 
+    GITHUB_SERVER_URL 
+} = process.env;
 
 // --- 1. Load and Update History ---
 function updateHistory(newResult) {
@@ -22,18 +28,18 @@ function updateHistory(newResult) {
             history = JSON.parse(fs.readFileSync(historyFilePath, 'utf8'));
             console.log(`[HISTORY] Successfully loaded ${history.length} historical entries.`);
             
-            // 🌟🌟🌟 FIX: Clean up old history entries with missing data 🌟🌟🌟
+            // Clean up old history entries with missing data 
             history = history.map(run => ({
                 timestamp: run.timestamp,
                 date: run.date,
-                // Ensure all core metrics default to 0 if missing from old file
                 total: run.total || 0,
                 passed: run.passed || 0,
                 failed: run.failed || 0,
                 skipped: run.skipped || 0,
-                duration: run.duration || 0
+                duration: run.duration || 0,
+                // Ensure runUrl exists, even if empty for old entries
+                runUrl: run.runUrl || '' 
             }));
-            // 🌟🌟🌟 End FIX 🌟🌟🌟
             
         } catch (e) {
             console.error("Error reading history file, starting fresh:", e.message);
@@ -42,44 +48,37 @@ function updateHistory(newResult) {
         console.log("[HISTORY] History file NOT FOUND. Starting with 0 historical entries.");
     }
 
-
-    // ----------------------------------------------------
-    // 💡 CRITICAL FIX: Robustly locate stats object
-    // ----------------------------------------------------
-    
-    // 1. Locate the correct statistics object from the new report
+    // CRITICAL FIX: Robustly locate stats object
     let stats = newResult?.stats;
-
-    // Fallback logic for reports where stats are nested deeper (a common Playwright report format)
     if (!stats || typeof stats.total !== 'number') {
         stats = newResult?.suites?.[0]?.stats;
     }
-
-    // 2. Final guarantee: If stats are still invalid, create a zeroed-out fallback
+    
+    // Final guarantee: If stats are still invalid, create a zeroed-out fallback
     if (!stats || typeof stats.total !== 'number') {
         stats = { total: 0, passed: 0, failed: 0, skipped: 0, duration: 0 };
         console.warn("Could not find valid test statistics in the JSON report. Using zeros for the current run.");
     }
 
-    console.log("Guaranteed stats block:", stats);
-
+    // 💡 NEW LOGIC: Construct the GitHub Actions Run URL
+    let runUrl = '';
+    if (GITHUB_SERVER_URL && GITHUB_REPOSITORY && GITHUB_RUN_ID) {
+        runUrl = `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`;
+    }
+    
     const timestamp = new Date().toISOString();
     const today = timestamp.split('T')[0];
         
-    // 3. Create the new history entry using the now-guaranteed 'stats' object
     const newRun = {
         timestamp,
         date: today,
-        // Since 'stats' is guaranteed to exist with numerical properties, we use them directly
         total: stats.total, 
         passed: stats.passed, 
         failed: stats.failed, 
         skipped: stats.skipped, 
-        duration: Math.round((stats.duration || 0) / 1000 / 60) // duration is in milliseconds, convert to minutes
+        duration: Math.round((stats.duration || 0) / 1000 / 60), // minutes
+        runUrl // 💡 Save the run URL
     };
-    // ----------------------------------------------------
-    // 💡 END CRITICAL FIX
-    // ----------------------------------------------------
 
     // Update or add the current run (to only keep one per day)
     const existingIndex = history.findIndex(run => run.date === today);
@@ -103,11 +102,9 @@ function updateHistory(newResult) {
 // --- 2. Generate Dashboard HTML ---
 function generateDashboard(history) {
     const labels = history.map(run => run.date);
-    // FIX 1: Use || 0 to replace any null/undefined in the trend data arrays
     const passedData = history.map(run => run.passed || 0);
     const failedData = history.map(run => run.failed || 0);
 
-    // FIX 2: Ensure currentStats always has numbers, using the last entry or default 0
     const lastRun = history[history.length - 1];
     const currentStats = lastRun ? {
         total: lastRun.total || 0,
@@ -116,7 +113,40 @@ function generateDashboard(history) {
         skipped: lastRun.skipped || 0
     } : { total: 0, passed: 0, failed: 0, skipped: 0 };
     
-    // The HTML content 
+    // Helper functions
+    const formatTime = (isoString) => {
+        if (!isoString) return 'N/A';
+        try {
+            return new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        } catch (e) {
+            return 'N/A';
+        }
+    };
+    const formatDuration = (minutes) => {
+        if (typeof minutes !== 'number') return 'N/A';
+        return `${(minutes * 60).toFixed(1)}s`;
+    }
+
+    // 💡 NEW LOGIC: Generate the detailed history table HTML with links
+    const historyTableRows = history.slice().reverse().map(run => {
+        const dateTime = `${run.date} @ ${formatTime(run.timestamp)}`;
+        const dateCell = run.runUrl 
+            ? `<a href="${run.runUrl}" target="_blank" title="View GitHub Actions Run Log">${dateTime}</a>`
+            : dateTime;
+        
+        return `
+            <tr>
+                <td>${dateCell}</td>
+                <td style="color:#2196F3; font-weight:bold;">${run.total || 0}</td>
+                <td style="color:#4CAF50;">${run.passed || 0}</td>
+                <td style="color:#F44336;">${run.failed || 0}</td>
+                <td style="color:#FFC107;">${run.skipped || 0}</td>
+                <td>${formatDuration(run.duration)}</td>
+            </tr>
+        `;
+    }).join('');
+    // 💡 END NEW LOGIC
+    
     const html = `
 <!DOCTYPE html>
 <html>
@@ -138,6 +168,30 @@ function generateDashboard(history) {
         .passed { background-color: #4CAF50; }
         .failed { background-color: #F44336; }
         .total { background-color: #2196F3; }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        .history-table th, .history-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .history-table th {
+            background-color: #f2f2f2;
+        }
+        .history-container {
+            margin-top: 40px;
+            max-height: 400px; 
+            overflow-y: auto; 
+        }
+        .history-table td a {
+            text-decoration: none;
+            color: #0366d6; /* GitHub blue link color */
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -158,6 +212,25 @@ function generateDashboard(history) {
             <h2>Latest Run Status (Pie Chart)</h2>
             <canvas id="pieChart"></canvas>
         </div>
+    </div>
+    
+    <h2>Detailed Run History (Last ${history.length} runs) - Click Date/Time for Run Log</h2>
+    <div class="history-container">
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Run Date/Time 🔗</th>
+                    <th>Total</th>
+                    <th>Passed</th>
+                    <th>Failed</th>
+                    <th>Skipped</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${historyTableRows}
+            </tbody>
+        </table>
     </div>
 
     <script>
@@ -210,11 +283,10 @@ function generateDashboard(history) {
 
 
 // --- 3. Main Execution (FINAL CRASH PREVENTION) ---
-let newResult = {}; // Initialize to empty object for safety
-let updatedHistory = []; // Initialize history array
+let newResult = {};
+let updatedHistory = [];
 
 try {
-    // 1. Try to read the Playwright report
     if (fs.existsSync(JSON_REPORT_PATH)) {
         const rawData = fs.readFileSync(JSON_REPORT_PATH, 'utf8');
         newResult = JSON.parse(rawData);
@@ -222,26 +294,21 @@ try {
         console.warn(`WARNING: Playwright report file not found at ${JSON_REPORT_PATH}. Generating dashboard using ONLY existing history.`);
     }
 
-    // 2. Ensure output directory exists
     if (!fs.existsSync(REPORTS_DIR)) {
         fs.mkdirSync(REPORTS_DIR);
     }
     
-    // 3. Update history (this handles missing stats/empty newResult safely)
     updatedHistory = updateHistory(newResult);
     
-    // 4. CRITICAL: Always call generateDashboard if history was loaded or created.
     if (updatedHistory.length > 0) {
         generateDashboard(updatedHistory);
     } else {
-        // FALLBACK: If history is empty, create a dummy dashboard to prevent crash
         console.warn("CRITICAL FALLBACK: History is empty. Creating a dummy index.html to prevent CI crash.");
         generateDashboard([]); 
     }
     
 } catch (error) {
     console.error('FATAL CRASH: Failed to generate dashboard due to unexpected error:', error.message);
-    // CRITICAL FIX: If we crash, try to write the blank dashboard one last time
     try {
         generateDashboard([]);
         console.log("Successfully created blank index.html during crash recovery.");
