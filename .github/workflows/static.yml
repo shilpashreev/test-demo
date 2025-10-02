@@ -25,7 +25,7 @@ jobs:
       - name: Checkout main repository code
         uses: actions/checkout@v4
         
-      # --- 2. Robust Download Previous History (FINAL FIX) ---
+      # --- 2. Robust Download Previous History ---
       - name: Download Previous Dashboard History (Robust)
         run: |
           git fetch origin gh-pages || echo "gh-pages branch not found (First run)."
@@ -33,7 +33,6 @@ jobs:
           if [ -d .git/refs/remotes/origin/gh-pages ]; then
             echo "gh-pages branch found. Attempting to retrieve report_history.json from remote root."
             mkdir -p gh-pages-temp
-            # Using the corrected path: remote_branch:filename
             git show origin/gh-pages:report_history.json > gh-pages-temp/report_history.json || echo "report_history.json not found in gh-pages root."
           else
             echo "Proceeding without history."
@@ -44,13 +43,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      
+          
       - name: Install dependencies and browsers
         run: |
           npm install 
           npx playwright install --with-deps
           
-      # --- 4. Prepare Dashboard Directory & Copy History ---
+      # 🌟🌟🌟 ADDED FIX 🌟🌟🌟
+      # --- 4. Create Output Folder for Playwright Reports ---
+      - name: Create Playwright Results Directory
+        run: mkdir -p results
+        
+      # --- 5. Prepare Dashboard Directory & Copy History ---
       - name: Prepare Dashboard Directory
         run: |
           mkdir -p dashboard-output
@@ -64,15 +68,15 @@ jobs:
             echo "No history file found. Starting new history."
           fi
           
-      # --- 5. Test Execution and Report Generation ---
+      # --- 6. Test Execution and Report Generation ---
       - name: Run Playwright tests and generate JSON/JUnit reports
         run: npx playwright test || true
         
-      # --- 6. Verify JUnit File Exists ---
+      # --- 7. Verify JUnit File Exists ---
       - name: Verify JUnit File Exists
         run: ls -l results/junit.xml
         
-      # --- 7. Publish JUnit Summary Report (To GitHub Check Runs) ---
+      # --- 8. Publish JUnit Summary Report (To GitHub Check Runs) ---
       - name: Publish JUnit XML Report
         uses: dorny/test-reporter@v1
         if: always()
@@ -82,7 +86,7 @@ jobs:
           reporter: jest-junit
           fail-on-error: true
           
-      # --- 8. Custom Dashboard Generation & Verification ---
+      # --- 9. Custom Dashboard Generation & Verification ---
       - name: Generate Historical Dashboard HTML
         run: node generate_dashboard.js
         
@@ -98,7 +102,7 @@ jobs:
             exit 1 
           fi
 
-      # --- 9. Deploy Dashboard to gh-pages ---
+      # --- 10. Deploy Dashboard to gh-pages ---
       - name: Deploy Dashboard with History
         uses: peaceiris/actions-gh-pages@v4
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
