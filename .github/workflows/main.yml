@@ -1,65 +1,72 @@
-name: Playwright – HTML & JUnit reports
+name: Playwright Tests & Reports
 
 on:
   push:
-  workflow_dispatch:
-
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      
 jobs:
-  test:
+  playwright_test:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node
+      
+      # --- Setup ---
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-
-      - name: Install deps
+      
+      - name: Install dependencies
         run: npm ci
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
-
-      # Run tests with reporters:
-      # - junit  -> creates ./results.xml (default filename)
-      # - html   -> creates ./playwright-report/ (with report.html)
-      - name: Run Playwright (HTML + JUnit)
-        run: |
-          set -eux
-          npx playwright test --reporter=junit,html
-          # Normalize junit location to ./test-results/results.xml
-          mkdir -p test-results
-          if [ -f results.xml ]; then
-            mv results.xml test-results/results.xml
-          fi
-
-      # (Optional) Show what was produced (helps when debugging)
-      - name: List generated reports
+      
+      # --- Test Execution & Report Generation ---
+      # This step runs tests and automatically generates two reports:
+      # 1. A **JUnit XML report** named 'results/junit.xml' (for status reporting).
+      # 2. An **HTML report** in the 'playwright-report' directory (for detailed viewing).
+      - name: Run Playwright tests
+        run: npx playwright test --reporter=html,junit:results/junit.xml
+        # The '|| true' ensures the step doesn't fail the workflow immediately 
+        # if tests fail, allowing the reporting steps to run.
+        continue-on-error: true 
+        # OR: run: npx playwright test; exit 0 
+      
+      # --- Reporting: Summary in PR/Workflow Run ---
+      # This action processes the JUnit XML file and posts a summary directly 
+      # to the workflow run page and (optionally) as a comment in a PR.
+      - name: Publish JUnit XML Report
+        uses: dorny/test-reporter@v1
         if: always()
-        run: |
-          echo "== test-results =="
-          find test-results -type f -maxdepth 2 -print || true
-          echo "== playwright-report =="
-          find playwright-report -type f -maxdepth 2 -print || true
-
-      # Upload JUnit XML
-      - name: Upload JUnit results
-        if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: junit-results
-          path: test-results/results.xml
-          if-no-files-found: error
-
-      # Upload the full HTML report folder (contains report.html + assets)
-      - name: Upload HTML report
-        if: always()
+          name: Playwright Test Results
+          path: results/junit.xml # Path to the JUnit file generated above
+          reporter: jest-junit # Format of the report
+          fail-on-error: true
+          
+      # --- Artifact Upload: HTML Report ---
+      # Uploads the self-contained HTML report directory for download and viewing.
+      - name: Upload Playwright HTML Report
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: playwright-report
-          path: playwright-report
-          if-no-files-found: error
+          name: playwright-html-report
+          path: playwright-report/
+          retention-days: 5
+          
+      # --- Artifact Upload: Screenshots/Videos (Optional) ---
+      # If your tests generate any screenshots or videos on failure, upload them too.
+      - name: Upload test results (videos/screenshots)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-artifacts
+          path: test-results/
+          retention-days: 5
