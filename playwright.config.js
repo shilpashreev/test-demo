@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['junit', { outputFile: 'test-results/results.xml' }],
-    ['html',  { outputFolder: 'playwright-report', open: 'never' }]
+    ['html',  { outputFolder: 'playwright-report' }]
   ],
   use: {
     baseURL: 'https://playwright.dev',
