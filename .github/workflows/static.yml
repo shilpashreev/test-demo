@@ -1,90 +1,81 @@
-name: Playwright Tests & Report Deployment
+name: Playwright Tests & Dashboard History
 
-# Trigger the workflow on pushes to the main branch or manual dispatch
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
-# Configure permissions required for checking out code and deploying to GitHub Pages
 permissions:
-  contents: read      # Required for actions/checkout
-  pages: write        # Required for actions/deploy-pages
-  id-token: write     # Required for the deploy step to authenticate
+  contents: write    # Required for peaceiris to commit to gh-pages
+  checks: write      # Required for dorny/test-reporter
 
 jobs:
-  build:
+  build_and_report:
     runs-on: ubuntu-latest
-    
-    # 💥 ADD THIS PERMISSIONS BLOCK TO THE JOB
     permissions:
-      contents: read      # Keep this
-      checks: write       # <--- THIS IS REQUIRED FOR dorny/test-reporter
-      pages: write        # Keep this for the deploy job
-      id-token: write     # Keep this for the deploy job
+      contents: write
+      checks: write
+      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      # --- Setup Environment ---
+      # --- Setup ---
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
       
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      
-      # --- Test Execution and Report Generation ---
-      - name: Run Playwright tests and generate reports
-        # The reports (HTML, JUnit) are generated based on playwright.config.js.
-        # '|| true' ensures the workflow continues to the deployment steps 
-        # even if tests fail, so you can see the report.
+      - name: Install dependencies and browsers
+        run: |
+          npm ci
+          npx playwright install --with-deps
+          
+      # --- Get Previous History (Required for Aggregation) ---
+      - name: Download Previous Dashboard History
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages # Checkout the gh-pages branch
+          path: gh-pages-temp
+          
+      # --- Create Dashboard Directory & Copy History ---
+      - name: Prepare Dashboard Directory
+        run: |
+          mkdir dashboard-output
+          # Copy history file from gh-pages branch if it exists
+          if [ -f gh-pages-temp/report_history.json ]; then
+            cp gh-pages-temp/report_history.json dashboard-output/
+          fi
+          
+      # --- Test Execution ---
+      - name: Run Playwright tests and generate JSON report
         run: npx playwright test || true
         
-      # --- JUnit Report: Show Summary in Workflow Run ---
-      # This action processes the JUnit XML (results/junit.xml) 
-      # and displays a pass/fail table on the workflow summary page.
+      # --- Custom Dashboard Generation ---
+      - name: Generate Historical Dashboard HTML
+        # The script reads the new JSON, updates the history file, 
+        # and creates index.html with charts in dashboard-output/
+        run: node generate_dashboard.js
+
+      # --- JUnit Report: Show Summary ---
       - name: Publish JUnit XML Report
         uses: dorny/test-reporter@v1
-        if: always() # Run regardless of test result
+        if: always()
         with:
           name: Playwright Test Results
-          path: results/junit.xml # Assumes your JUnit reporter output path
+          path: results/junit.xml
           reporter: jest-junit
-          fail-on-error: true # Fails the reporter step if XML is invalid
+          fail-on-error: true
           
-      # --- HTML Report: Prepare for GitHub Pages Deployment ---
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload HTML Report artifact
-        uses: actions/upload-pages-artifact@v3
-        if: always() # Run regardless of test result
+      # --- Deploy Dashboard to gh-pages ---
+      - name: Deploy Dashboard with History
+        uses: peaceiris/actions-gh-pages@v4
+        if: github.ref == 'refs/heads/main'
         with:
-          # This must match the output directory of Playwright's HTML reporter
-          path: 'playwright-report' 
-
-  deploy:
-    # This job only runs if the 'build' job succeeded
-    needs: build 
-    runs-on: ubuntu-latest
-    
-    # Define the deployment environment
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-      
-    steps:
-      # --- Deploy to GitHub Pages ---
-      # This step takes the uploaded artifact and publishes it as your GitHub Page.
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # The directory containing index.html and the history JSON
+          publish_dir: ./dashboard-output 
+          publish_branch: gh-pages
+          # Overwrite the root of the gh-pages branch with the new dashboard
+          destination_dir: .
