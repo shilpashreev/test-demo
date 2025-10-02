@@ -1,14 +1,14 @@
-<testsuites id="" name="" tests="3" failures="0" skipped="0" errors="0" time="9.914727">
-<testsuite name="test1-ex.spec.js" timestamp="2025-10-02T11:48:55.065Z" hostname="chromium" tests="1" failures="0" skipped="0" time="1.196" errors="0">
-<testcase name="home → get started" classname="test1-ex.spec.js" time="1.196">
+<testsuites id="" name="" tests="3" failures="0" skipped="0" errors="0" time="10.119806">
+<testsuite name="test1-ex.spec.js" timestamp="2025-10-02T11:57:29.782Z" hostname="chromium" tests="1" failures="0" skipped="0" time="1.169" errors="0">
+<testcase name="home → get started" classname="test1-ex.spec.js" time="1.169">
 </testcase>
 </testsuite>
-<testsuite name="test1-ex.spec.js" timestamp="2025-10-02T11:48:55.065Z" hostname="firefox" tests="1" failures="0" skipped="0" time="2.241" errors="0">
-<testcase name="home → get started" classname="test1-ex.spec.js" time="2.241">
+<testsuite name="test1-ex.spec.js" timestamp="2025-10-02T11:57:29.782Z" hostname="firefox" tests="1" failures="0" skipped="0" time="2.182" errors="0">
+<testcase name="home → get started" classname="test1-ex.spec.js" time="2.182">
 </testcase>
 </testsuite>
-<testsuite name="test1-ex.spec.js" timestamp="2025-10-02T11:48:55.065Z" hostname="webkit" tests="1" failures="0" skipped="0" time="5.294" errors="0">
-<testcase name="home → get started" classname="test1-ex.spec.js" time="5.294">
+<testsuite name="test1-ex.spec.js" timestamp="2025-10-02T11:57:29.782Z" hostname="webkit" tests="1" failures="0" skipped="0" time="5.382" errors="0">
+<testcase name="home → get started" classname="test1-ex.spec.js" time="5.382">
 </testcase>
 </testsuite>
 </testsuites>
