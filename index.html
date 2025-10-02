@@ -25,9 +25,9 @@
     <h1>Playwright Test Dashboard (Last 15 Days)</h1>
 
     <div class="stats">
-        <div class="stat-box total">Total Tests: undefined</div>
-        <div class="stat-box passed">Passed: undefined</div>
-        <div class="stat-box failed">Failed: undefined</div>
+        <div class="stat-box total">Total Tests: 0</div>
+        <div class="stat-box passed">Passed: 0</div>
+        <div class="stat-box failed">Failed: 0</div>
     </div>
 
     <div class="grid">
@@ -43,15 +43,15 @@
 
     <script>
         // Data from the script execution
-        const labels = ["2025-10-02"];
-        const passedData = [null];
-        const failedData = [null];
-        const currentPassed = undefined;
-        const currentFailed = undefined;
+        const labels = [];
+        const passedData = [];
+        const failedData = [];
+        const currentPassed = 0;
+        const currentFailed = 0;
         const currentSkipped = 0;
 
         // Bar Chart (Trend)
-        if (labels.length > 0) { // Check data exists before trying to draw
+        if (labels.length > 0) {
             new Chart(document.getElementById('barChart'), {
                 type: 'bar',
                 data: {
