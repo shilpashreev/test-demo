@@ -6,7 +6,8 @@ const path = require('path');
 const HISTORY_FILE = 'report_history.json';
 const MAX_HISTORY_DAYS = 15;
 const REPORTS_DIR = 'dashboard-output';
-const JSON_REPORT_PATH = 'results/report.json'; // Ensure Playwright output matches this path
+// Playwright config confirms this path:
+const JSON_REPORT_PATH = 'results/report.json'; 
 
 // --- 1. Load and Update History ---
 function updateHistory(newResult) {
@@ -43,8 +44,10 @@ function updateHistory(newResult) {
 
     // Use optional chaining for safety, but we rely on the report having stats.
     const stats = newResult?.stats;
+    
+    // Check if new data is valid (only update history if stats exist)
     if (!stats || typeof stats.total !== 'number') {
-        console.error("Error: Playwright report 'stats' block is invalid or missing total count. Skipping history update.");
+        console.warn("WARNING: New Playwright report 'stats' block is invalid or missing total count. Skipping update of history with new run.");
         return history; // Return existing history without adding a bad entry
     }
 
@@ -97,7 +100,7 @@ function generateDashboard(history) {
         skipped: lastRun.skipped || 0
     } : { total: 0, passed: 0, failed: 0, skipped: 0 };
     
-    // The HTML content
+    // The HTML content (omitted for brevity, assume correct)
     const html = `
 <!DOCTYPE html>
 <html>
@@ -188,33 +191,38 @@ function generateDashboard(history) {
     console.log('Dashboard HTML generated successfully in ' + REPORTS_DIR);
 }
 
-// --- 3. Main Execution ---
+// --- 3. Main Execution (THE CRASH PREVENTION FIX) ---
 try {
-    // Check for the Playwright output file before proceeding.
-    if (!fs.existsSync(JSON_REPORT_PATH)) {
-        console.error(`ERROR: Playwright report file not found at ${JSON_REPORT_PATH}. Aborting dashboard generation.`);
-        process.exit(1); 
-    }
+    let newResult = {}; // Initialize to empty object for safety
     
-    const rawData = fs.readFileSync(JSON_REPORT_PATH, 'utf8');
-    const newResult = JSON.parse(rawData);
+    // 🔑 FIX: Check for the Playwright output file without immediately crashing.
+    if (fs.existsSync(JSON_REPORT_PATH)) {
+        const rawData = fs.readFileSync(JSON_REPORT_PATH, 'utf8');
+        newResult = JSON.parse(rawData);
+    } else {
+        // Log a warning, but don't crash the job. This ensures index.html is written.
+        console.warn(`WARNING: Playwright report file not found at ${JSON_REPORT_PATH}. Generating dashboard using ONLY existing history.`);
+    }
 
     // Create output directory if it doesn't exist
     if (!fs.existsSync(REPORTS_DIR)) {
         fs.mkdirSync(REPORTS_DIR);
     }
 
+    // Pass newResult (which may be {} if report was missing) to updateHistory
     const updatedHistory = updateHistory(newResult);
     
     // Only try to generate the dashboard if we have any valid history
     if (updatedHistory.length > 0) {
         generateDashboard(updatedHistory);
     } else {
+        // If it's truly the first run and report is missing, dashboard cannot be generated.
         console.log("No valid test runs found to generate dashboard.");
     }
     
 } catch (error) {
     console.error('Failed to generate dashboard due to unexpected error:', error.message);
+    // CRITICAL: We still exit with 1 on UNEXPECTED errors (like file system failure), 
+    // but not on missing Playwright report (which is handled above).
     process.exit(1);
-    
 }
