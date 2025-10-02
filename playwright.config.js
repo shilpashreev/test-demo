@@ -6,10 +6,16 @@ export default defineConfig({
   timeout: 30_000,
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
+  // Configure reporters
   reporter: [
-    ['list'],
-    ['junit', { outputFile: 'test-results/results.xml' }],
-    ['html',  { outputFolder: 'playwright-report' }]
+    // This generates the interactive HTML report in 'playwright-report/'
+    ['html', { open: 'never' }], 
+    
+    // This generates the JUnit XML report in 'results/junit.xml'
+    ['junit', { outputFile: 'results/junit.xml' }],
+    
+    // Always include 'list' for console output during the run
+    ['list'] 
   ],
   use: {
     baseURL: 'https://playwright.dev',
