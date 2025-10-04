@@ -70,6 +70,10 @@ jobs:
         run: |
           REPO_ID="${{ secrets.CLOUD_PROJECT }}"  # e.g., 'my-org/my-repo'
           FILENAME="playwright-report-${{ github.run_id }}.tar.gz"
+
+          # Print the URL being used
+          echo "Cloudsmith Repository ID: $REPO_ID"
+          echo "Cloudsmith API URL: $UPLOAD_URL"
           
           # Use curl to upload the file to Cloudsmith's generic repository format
           # This requires CLOUD_API_KEY to be a secret containing your Cloudsmith API token.
