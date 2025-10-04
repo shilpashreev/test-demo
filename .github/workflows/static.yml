@@ -57,35 +57,8 @@ jobs:
           reporter: jest-junit
           fail-on-error: true
           
-      # Generate Custom Dashboard (Updates report_history.json)
-      - name: Generate Historical Dashboard HTML
-        run: node generate_dashboard.js
-        env:
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          
-      # 💡 CRITICAL STEP: Commit the updated history file back to the repo
-      - name: Commit Historical Report File
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: 'CI: Update test run history [skip ci]'
-          # Only commit the history file and the folder containing the history
-          files: 'dashboard-output/report_history.json' 
-          branch: ${{ github.ref_name }} # Commits to the current branch (e.g., main)
-          
-      # Setup for Pages deployment
-      - name: Setup Pages1
-        uses: actions/configure-pages@v5
-        
-      # Upload Custom Dashboard Artifact
-      - name: Upload Custom Dashboard Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dashboard-output/
-          
       - name: Archive Report for Cloudsmith
-        run: tar -czvf playwright-report-${{ github.run_id }}.tar.gz dashboard-output/
+        run: tar -czvf playwright-report-${{ github.run_id }}.tar.gz results/
         
       - name: Upload Report to Cloudsmith
         run: |
