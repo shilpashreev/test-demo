@@ -83,3 +83,19 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dashboard-output/
+          
+      - name: Archive Report for Cloudsmith
+        run: tar -czvf playwright-report-${{ github.run_id }}.tar.gz dashboard-output/
+        
+      - name: Upload Report to Cloudsmith
+        run: |
+          REPO_ID="${{ secrets.CLOUD_PROJECT }}"  # e.g., 'my-org/my-repo'
+          FILENAME="playwright-report-${{ github.run_id }}.tar.gz"
+          
+          # Use curl to upload the file to Cloudsmith's generic repository format
+          # Adjust the URL format if your Cloudsmith repository is a specific type (e.g., npm)
+          curl -sS --fail -u "${{ secrets.CLOUD_API_KEY }}": \
+            -F "package_file=@$FILENAME" \
+            "https://api.cloudsmith.io/v1/repos/$REPO_ID/uploads/generic/"
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUD_API_KEY }}
