@@ -77,9 +77,9 @@ jobs:
           
           # Use curl to upload the file to Cloudsmith's generic repository format
           # This requires CLOUD_API_KEY to be a secret containing your Cloudsmith API token.
-          curl -sS --fail -u "csa_6c7eae9f603d198f4142d8ac0fc409LEFHQg": \
+          curl -sS --fail -u "": \
             -F "package_file=@$FILENAME" \
-            "https://api.cloudsmith.io/v1/repos/demo-dgov/test1/uploads/generic/"
+            ""
         env:
           # Injecting the key securely into the environment for curl
-          CLOUDSMITH_API_KEY: "csa_6c7eae9f603d198f4142d8ac0fc409LEFHQg"
+          CLOUDSMITH_API_KEY: ""
