@@ -1,4 +1,4 @@
-name: Playwright Tests & Deploy Report to Pages
+name: Playwright Tests & Upload Report to Cloudsmith
 
 on:
   push:
@@ -13,25 +13,22 @@ on:
 # Grant necessary permissions
 permissions:
   contents: read      # For checking out the code
-  pages: write        # To deploy to GitHub Pages
-  id-token: write     # For authentication required by deploy-pages action
-
+  checks: write       # To publish test results summary
+  id-token: write     # Needed if you use any other OIDC auth, kept as safety
 
 jobs:
-  build_and_test:
-    name: Build & Run Tests
+  build_test_and_upload:
+    name: Run Tests and Upload Report
     runs-on: ubuntu-latest
     permissions:
-      contents: write # REQUIRED to commit report_history.json
-      checks: write
+      checks: write # Required for test reporter
+    
     steps:
-      # 1. Checkout Code - IMPORTANT: Must fetch history
+      # 1. Checkout Code
       - name: Checkout repository code
         uses: actions/checkout@v4
-        with:
-          # Ensure you fetch the full history, not just the current commit
-          fetch-depth: 0 
-
+        # fetch-depth: 0 is not needed anymore since you are not committing history.
+        
       # Setup Environment
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -43,11 +40,14 @@ jobs:
           npm install 
           npx playwright install --with-deps
           
-      # Run Tests and Generate JSON report
+      # Run Tests and Generate Report (Playwright saves report data to 'playwright-report' by default)
       - name: Run Playwright tests
+        # We use '|| true' to allow the workflow to continue even if tests fail, 
+        # so the report can still be uploaded.
         run: npx playwright test || true
       
-      # Publish JUnit Summary (Optional)
+      # Publish JUnit Summary (Optional, but good practice)
+      # This assumes you are configuring Playwright to output a JUnit XML report (e.g., to results/junit.xml)
       - name: Publish JUnit XML Report to Checks
         uses: dorny/test-reporter@v1
         if: always()
@@ -57,18 +57,25 @@ jobs:
           reporter: jest-junit
           fail-on-error: true
           
-      - name: Archive Report for Cloudsmith
-        run: tar -czvf playwright-report-${{ github.run_id }}.tar.gz results/
+      # 📌 Prepare and upload Playwright Report for Cloudsmith
+      
+      # 2. Archive the Playwright Report folder
+      - name: Archive Playwright Report for Cloudsmith
+        # Playwright's default HTML report folder is 'playwright-report/'
+        # Adjust 'playwright-report/' if your config uses a different directory.
+        run: tar -czvf playwright-report-${{ github.run_id }}.tar.gz playwright-report/
         
+      # 3. Upload Report to Cloudsmith
       - name: Upload Report to Cloudsmith
         run: |
           REPO_ID="${{ secrets.CLOUD_PROJECT }}"  # e.g., 'my-org/my-repo'
           FILENAME="playwright-report-${{ github.run_id }}.tar.gz"
           
           # Use curl to upload the file to Cloudsmith's generic repository format
-          # Adjust the URL format if your Cloudsmith repository is a specific type (e.g., npm)
+          # This requires CLOUD_API_KEY to be a secret containing your Cloudsmith API token.
           curl -sS --fail -u "${{ secrets.CLOUD_API_KEY }}": \
             -F "package_file=@$FILENAME" \
             "https://api.cloudsmith.io/v1/repos/$REPO_ID/uploads/generic/"
         env:
+          # Injecting the key securely into the environment for curl
           CLOUDSMITH_API_KEY: ${{ secrets.CLOUD_API_KEY }}
