@@ -57,29 +57,4 @@ jobs:
           reporter: jest-junit
           fail-on-error: true
           
-      # 📌 Prepare and upload Playwright Report for Cloudsmith
       
-      # 2. Archive the Playwright Report folder
-      - name: Archive Playwright Report for Cloudsmith
-        # Playwright's default HTML report folder is 'playwright-report/'
-        # Adjust 'playwright-report/' if your config uses a different directory.
-        run: tar -czvf playwright-report-${{ github.run_id }}.tar.gz playwright-report/
-        
-      # 3. Upload Report to Cloudsmith
-      - name: Upload Report to Cloudsmith
-        run: |
-          REPO_ID="${{ secrets.CLOUD_PROJECT }}"  # e.g., 'my-org/my-repo'
-          FILENAME="playwright-report-${{ github.run_id }}.tar.gz"
-
-          # Print the URL being used
-          echo "Cloudsmith Repository ID: $REPO_ID"
-          echo "Cloudsmith API URL: $UPLOAD_URL"
-          
-          # Use curl to upload the file to Cloudsmith's generic repository format
-          # This requires CLOUD_API_KEY to be a secret containing your Cloudsmith API token.
-          curl -sS --fail -u "": \
-            -F "package_file=@$FILENAME" \
-            ""
-        env:
-          # Injecting the key securely into the environment for curl
-          CLOUDSMITH_API_KEY: ""
