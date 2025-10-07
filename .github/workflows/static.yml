@@ -46,15 +46,5 @@ jobs:
         # so the report can still be uploaded.
         run: npx playwright test || true
       
-      # Publish JUnit Summary (Optional, but good practice)
-      # This assumes you are configuring Playwright to output a JUnit XML report (e.g., to results/junit.xml)
-      - name: Publish JUnit XML Report to Checks
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Playwright Test Results
-          path: results/junit.xml
-          reporter: jest-junit
-          fail-on-error: true
-          
+
       
