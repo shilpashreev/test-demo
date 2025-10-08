@@ -13,39 +13,67 @@
 <body>
   <h1>Test Results Dashboard</h1>
   <canvas id="resultsChart"></canvas>
-
   <script>
     async function loadAndVisualize() {
-      const response = await fetch('test-results.xml');
-      const xmlText = await response.text();
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
-      
-      const testcases = Array.from(xmlDoc.getElementsByTagName('testcase'));
-      const names = testcases.map(tc => tc.getAttribute('name'));
-      const results = testcases.map(tc => tc.getAttribute('result'));
-
-      const passCount = results.filter(r => r === 'passed').length;
-      const failCount = results.filter(r => r === 'failed').length;
-
-      const ctx = document.getElementById('resultsChart');
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Passed', 'Failed'],
-          datasets: [{
-            label: 'Test Results',
-            data: [passCount, failCount],
-            backgroundColor: ['#4CAF50', '#F44336']
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            y: { beginAtZero: true, precision: 0 }
+      try {
+          const response = await fetch('test-results.xml');
+          if (!response.ok) {
+              console.error('Failed to fetch test-results.xml:', response.statusText);
+              document.body.innerHTML += '<p style="color: red;">Error: Could not load test-results.xml. Status: ' + response.status + '</p>';
+              return;
           }
-        }
-      });
+          const xmlText = await response.text();
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+          
+          const testcases = Array.from(xmlDoc.getElementsByTagName('testcase'));
+          
+          // CORRECTED LOGIC: Use 'status' attribute and check for 'PASSED' and 'FAILED'
+          const results = testcases.map(tc => tc.getAttribute('status'));
+          
+          // Case-insensitive check and use of 'PASSED'/'FAILED' as seen in the XML
+          const passCount = results.filter(r => r && r.toUpperCase() === 'PASSED').length;
+          const failCount = results.filter(r => r && r.toUpperCase() === 'FAILED').length;
+          
+          if (testcases.length === 0) {
+              document.body.innerHTML += '<p>No test cases found in XML report.</p>';
+              return;
+          }
+
+          const ctx = document.getElementById('resultsChart');
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: ['Passed', 'Failed'],
+              datasets: [{
+                label: 'Total Tests',
+                data: [passCount, failCount],
+                backgroundColor: ['#4CAF50', '#F44336']
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: { beginAtZero: true, precision: 0 }
+              }
+            }
+          });
+
+          // Optional: Add a simple table for details
+          let tableHtml = '<h2>Detailed Results</h2><table border="1" style="width:100%; text-align:left;"><thead><tr><th>Test Name</th><th>Status</th></tr></thead><tbody>';
+          testcases.forEach(tc => {
+              const name = tc.getAttribute('name') || 'N/A';
+              const status = tc.getAttribute('status') || 'UNKNOWN';
+              const color = status.toUpperCase() === 'PASSED' ? 'green' : (status.toUpperCase() === 'FAILED' ? 'red' : 'black');
+              tableHtml += '<tr><td>' + name + '</td><td style="color:' + color + ';">' + status + '</td></tr>';
+          });
+          tableHtml += '</tbody></table>';
+          document.body.innerHTML += tableHtml;
+
+      } catch (error) {
+          console.error('Error in loadAndVisualize:', error);
+          document.body.innerHTML += '<p style="color: red;">An error occurred while processing the report.</p>';
+      }
     }
     loadAndVisualize();
   </script>
