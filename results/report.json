@@ -1,0 +1,312 @@
+{
+  "config": {
+    "configFile": "/home/runner/work/test-demo/test-demo/playwright.config.js",
+    "rootDir": "/home/runner/work/test-demo/test-demo/tests",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "ci": {
+        "commitHref": "https://github.com/shilpashreev/test-demo/commit/d61a7758263be79df9f9e182819d3675553268e4",
+        "commitHash": "d61a7758263be79df9f9e182819d3675553268e4",
+        "buildHref": "https://github.com/shilpashreev/test-demo/actions/runs/18192197723"
+      },
+      "gitCommit": {
+        "shortHash": "d61a775",
+        "hash": "d61a7758263be79df9f9e182819d3675553268e4",
+        "subject": "sdf",
+        "body": "sdf\n",
+        "author": {
+          "name": "shilpashree veerappa",
+          "email": "shilpashreeveerappa@shilpashreesAir.lan",
+          "time": 1759406117000
+        },
+        "committer": {
+          "name": "shilpashree veerappa",
+          "email": "shilpashreeveerappa@shilpashreesAir.lan",
+          "time": 1759406117000
+        },
+        "branch": "main"
+      },
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        {
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "results/report.json"
+        }
+      ],
+      [
+        "junit",
+        {
+          "outputFile": "results/junit.xml"
+        }
+      ],
+      [
+        "list",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/test-demo/test-demo/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/shilpashreev/test-demo/commit/d61a7758263be79df9f9e182819d3675553268e4",
+            "commitHash": "d61a7758263be79df9f9e182819d3675553268e4",
+            "buildHref": "https://github.com/shilpashreev/test-demo/actions/runs/18192197723"
+          },
+          "gitCommit": {
+            "shortHash": "d61a775",
+            "hash": "d61a7758263be79df9f9e182819d3675553268e4",
+            "subject": "sdf",
+            "body": "sdf\n",
+            "author": {
+              "name": "shilpashree veerappa",
+              "email": "shilpashreeveerappa@shilpashreesAir.lan",
+              "time": 1759406117000
+            },
+            "committer": {
+              "name": "shilpashree veerappa",
+              "email": "shilpashreeveerappa@shilpashreesAir.lan",
+              "time": 1759406117000
+            },
+            "branch": "main"
+          },
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/home/runner/work/test-demo/test-demo/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/runner/work/test-demo/test-demo/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/shilpashreev/test-demo/commit/d61a7758263be79df9f9e182819d3675553268e4",
+            "commitHash": "d61a7758263be79df9f9e182819d3675553268e4",
+            "buildHref": "https://github.com/shilpashreev/test-demo/actions/runs/18192197723"
+          },
+          "gitCommit": {
+            "shortHash": "d61a775",
+            "hash": "d61a7758263be79df9f9e182819d3675553268e4",
+            "subject": "sdf",
+            "body": "sdf\n",
+            "author": {
+              "name": "shilpashree veerappa",
+              "email": "shilpashreeveerappa@shilpashreesAir.lan",
+              "time": 1759406117000
+            },
+            "committer": {
+              "name": "shilpashree veerappa",
+              "email": "shilpashreeveerappa@shilpashreesAir.lan",
+              "time": 1759406117000
+            },
+            "branch": "main"
+          },
+          "actualWorkers": 2
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/home/runner/work/test-demo/test-demo/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/runner/work/test-demo/test-demo/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/shilpashreev/test-demo/commit/d61a7758263be79df9f9e182819d3675553268e4",
+            "commitHash": "d61a7758263be79df9f9e182819d3675553268e4",
+            "buildHref": "https://github.com/shilpashreev/test-demo/actions/runs/18192197723"
+          },
+          "gitCommit": {
+            "shortHash": "d61a775",
+            "hash": "d61a7758263be79df9f9e182819d3675553268e4",
+            "subject": "sdf",
+            "body": "sdf\n",
+            "author": {
+              "name": "shilpashree veerappa",
+              "email": "shilpashreeveerappa@shilpashreesAir.lan",
+              "time": 1759406117000
+            },
+            "committer": {
+              "name": "shilpashree veerappa",
+              "email": "shilpashreeveerappa@shilpashreesAir.lan",
+              "time": 1759406117000
+            },
+            "branch": "main"
+          },
+          "actualWorkers": 2
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/home/runner/work/test-demo/test-demo/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.55.0",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "test1-ex.spec.js",
+      "file": "test1-ex.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "home → get started",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1169,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2025-10-02T11:57:30.317Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4434b766b0017fd5953d-9d6eae4f065e3293ac1a",
+          "file": "test1-ex.spec.js",
+          "line": 3,
+          "column": 5
+        },
+        {
+          "title": "home → get started",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2182,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2025-10-02T11:57:30.315Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4434b766b0017fd5953d-2c337ebc74f66665a4e9",
+          "file": "test1-ex.spec.js",
+          "line": 3,
+          "column": 5
+        },
+        {
+          "title": "home → get started",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5382,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2025-10-02T11:57:33.698Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4434b766b0017fd5953d-7a517d6f3c718261802e",
+          "file": "test1-ex.spec.js",
+          "line": 3,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-10-02T11:57:29.746Z",
+    "duration": 10119.806,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

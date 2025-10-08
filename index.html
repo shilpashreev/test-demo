@@ -1,85 +1,53 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Playwright Test Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-        .stats { margin-bottom: 30px; }
-        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .stat-box { 
-          padding: 15px; 
-          border-radius: 5px; 
-          display: inline-block; 
-          margin-right: 15px; 
-          color: white; 
-        }
-        .passed { background-color: #4CAF50; }
-        .failed { background-color: #F44336; }
-        .total { background-color: #2196F3; }
-    </style>
+  <meta charset="UTF-8">
+  <title>GitHub Actions Test Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    h1 { text-align: center; }
+    canvas { max-width: 600px; margin: 0 auto; display: block; }
+  </style>
 </head>
 <body>
-    <h1>Playwright Test Dashboard (Last 15 Days)</h1>
+  <h1>Test Results Dashboard</h1>
+  <canvas id="resultsChart"></canvas>
 
-    <div class="stats">
-        <div class="stat-box total">Total Tests: 0</div>
-        <div class="stat-box passed">Passed: 0</div>
-        <div class="stat-box failed">Failed: 0</div>
-    </div>
+  <script>
+    async function loadAndVisualize() {
+      const response = await fetch('test-results.xml');
+      const xmlText = await response.text();
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+      
+      const testcases = Array.from(xmlDoc.getElementsByTagName('testcase'));
+      const names = testcases.map(tc => tc.getAttribute('name'));
+      const results = testcases.map(tc => tc.getAttribute('result'));
 
-    <div class="grid">
-        <div class="chart-container">
-            <h2>Pass/Fail Trend (Bar Chart)</h2>
-            <canvas id="barChart"></canvas>
-        </div>
-        <div class="chart-container">
-            <h2>Latest Run Status (Pie Chart)</h2>
-            <canvas id="pieChart"></canvas>
-        </div>
-    </div>
+      const passCount = results.filter(r => r === 'passed').length;
+      const failCount = results.filter(r => r === 'failed').length;
 
-    <script>
-        // Data from the script execution
-        const labels = ["2025-10-02"];
-        const passedData = [0];
-        const failedData = [0];
-        const currentPassed = 0;
-        const currentFailed = 0;
-        const currentSkipped = 0;
-
-        // Bar Chart (Trend)
-        if (labels.length > 0) {
-            new Chart(document.getElementById('barChart'), {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Passed', data: passedData, backgroundColor: '#4CAF50' },
-                        { label: 'Failed', data: failedData, backgroundColor: '#F44336' }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: { x: { stacked: true }, y: { stacked: true } }
-                }
-            });
-
-            // Pie Chart (Latest Run Breakdown)
-            new Chart(document.getElementById('pieChart'), {
-                type: 'pie',
-                data: {
-                    labels: ['Passed', 'Failed', 'Skipped'],
-                    datasets: [{
-                        data: [currentPassed, currentFailed, currentSkipped],
-                        backgroundColor: ['#4CAF50', '#F44336', '#FFC107']
-                    }]
-                },
-                options: { responsive: true }
-            });
+      const ctx = document.getElementById('resultsChart');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Passed', 'Failed'],
+          datasets: [{
+            label: 'Test Results',
+            data: [passCount, failCount],
+            backgroundColor: ['#4CAF50', '#F44336']
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true, precision: 0 }
+          }
         }
-    </script>
+      });
+    }
+    loadAndVisualize();
+  </script>
 </body>
 </html>
