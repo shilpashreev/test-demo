@@ -31,9 +31,6 @@
         <![CDATA[ ]]>
       </system-err>
     </testcase>
-    <testcase name="Test Cases/PartyManagement/AnotherFailedTest" time="0.5" classname="Test Cases/PartyManagement/AnotherFailedTest" status="FAILED">
-      <failure message="Assertion Failed" type="AssertionError"/>
-    </testcase>
     <system-out>
       <![CDATA[ 29-09-2025T11:37:27 - [TEST_SUITE][PASSED] - MigrationTestCase: null ]]>
     </system-out>
