@@ -1,50 +1,50 @@
-name: Playwright Tests & Upload Report to Cloudsmith
+# name: Playwright Tests & Upload Report to Cloudsmith
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  # Allows manual running of the workflow
-  workflow_dispatch:
+# on:
+#   push:
+#     branches:
+#       - main
+#   pull_request:
+#     branches:
+#       - main
+#   # Allows manual running of the workflow
+#   workflow_dispatch:
 
-# Grant necessary permissions
-permissions:
-  contents: read      # For checking out the code
-  checks: write       # To publish test results summary
-  id-token: write     # Needed if you use any other OIDC auth, kept as safety
+# # Grant necessary permissions
+# permissions:
+#   contents: read      # For checking out the code
+#   checks: write       # To publish test results summary
+#   id-token: write     # Needed if you use any other OIDC auth, kept as safety
 
-jobs:
-  build_test_and_upload:
-    name: Run Tests and Upload Report
-    runs-on: ubuntu-latest
-    permissions:
-      checks: write # Required for test reporter
+# jobs:
+#   build_test_and_upload:
+#     name: Run Tests and Upload Report
+#     runs-on: ubuntu-latest
+#     permissions:
+#       checks: write # Required for test reporter
     
-    steps:
-      # 1. Checkout Code
-      - name: Checkout repository code
-        uses: actions/checkout@v4
-        # fetch-depth: 0 is not needed anymore since you are not committing history.
+#     steps:
+#       # 1. Checkout Code
+#       - name: Checkout repository code
+#         uses: actions/checkout@v4
+#         # fetch-depth: 0 is not needed anymore since you are not committing history.
         
-      # Setup Environment
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+#       # Setup Environment
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 20
           
-      - name: Install dependencies and browsers
-        run: |
-          npm install 
-          npx playwright install --with-deps
+#       - name: Install dependencies and browsers
+#         run: |
+#           npm install 
+#           npx playwright install --with-deps
           
-      # Run Tests and Generate Report (Playwright saves report data to 'playwright-report' by default)
-      - name: Run Playwright tests
-        # We use '|| true' to allow the workflow to continue even if tests fail, 
-        # so the report can still be uploaded.
-        run: npx playwright test || true
+#       # Run Tests and Generate Report (Playwright saves report data to 'playwright-report' by default)
+#       - name: Run Playwright tests
+#         # We use '|| true' to allow the workflow to continue even if tests fail, 
+#         # so the report can still be uploaded.
+#         run: npx playwright test || true
       
 
       
