@@ -126,41 +126,148 @@
 #           github_token: ${{ secrets.GITHUB_TOKEN }}
 #           publish_dir: .
 
-    name: Publish Test Reports to GitHub Pages
+name: Publish Test Report to GitHub Pages
 
-    on:
-      push:
-        branches: [ main ]
-      schedule:
-        - cron: '0 0 * * *' # Run daily at midnight UTC
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
-    jobs:
-      build-and-deploy:
-        runs-on: ubuntu-latest
-        steps:
-          - name: Checkout code
-            uses: actions/checkout@v4
+jobs:
+  generate_and_publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # Change to 'read' if you only deploy, 'write' if you create/commit
+      pages: write # Required for publishing pages
+      id-token: write # Required for deployment action
 
-          - name: Set up Java (or Node.js, Python, etc.)
-            uses: actions/setup-java@v4
-            with:
-              java-version: '17'
-              distribution: 'temurin'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-          - name: Install dependencies and run tests
-            run: |
-              mvn clean install # Or npm install && npm test, etc.
+      # --- Step 1: Generate sample XML test report (No changes needed here for logic) ---
+      - name: Generate sample XML test report
+        run: |
+          cat <<EOF > test-results.xml
+          <testsuites name="MigrationTestCase" time="3.073" tests="1" failures="0" errors="0">
+            <testsuite name="MigrationTestCase" tests="1" failures="0" errors="0" time="3.073" skipped="0" timestamp="2025-09-29T11:37:27.116Z" hostname="root - kube-arc-runner-set-d5vk5-runner-df7kp-workflow" id="Test Suites/MigrationTestCase">
+              <properties>
+                <property name="deviceName" value=""/>
+                <property name="devicePlatform"/>
+                <property name="logFolder" value="/__w/PE-QE-Katalon-Test-Automation-Programme/PE-QE/katalon-project/Reports/20250929_113723/MigrationTestCase/20250929_113724"/>
+                <property name="logFiles" value="/_w/PE-QE-Katalon-Test-Automation-Programme/PE-QE/katalon-project/Reports/20250929_113723/MigrationTestCase/20250929_113724/console0.log, /_w/PE-QE/PE-QE/katalon-project/Reports/20250929_113723/MigrationTestCase/20250929_113724/execution0.log"/>
+                <property name="attachments" value=""/>
+                <property name="hostName" value="root - kube-arc-data-set"/>
+                <property name="os" value="Linux 64bit"/>
+                <property name="katalonVersion" value="10.3.1.0"/>
+                <property name="browser" value="Chrome 139.0.7258.127"/>
+                <property name="userFullName" value="Test"/>
+                <property name="hostAddress" value="10.211.22.111"/>
+                <property name="sessionId" value="3805de2a0489b19605050476a512345"/>
+                <property name="projectName" value="Katalon Automation POC"/>
+                <property name="seleniumVersion" value="4.28.1"/>
+                <property name="proxyInformation" value="ProxyInformation { proxyOption=NO_PROXY, proxyServerType=HTTP, username=, password=****, proxyServerAddress=, proxyServerPort=0, executionList="", isApplyToDesiredCapabilities=true }"/>
+                <property name="platform" value="Linux"/>
+              </properties>
+              <testcase name="Test Cases/PartyManagement/262236_CreateGeneralnsured" time="2.678" classname="Test Cases/PartyManagement/262236_CreateGeneralnsured" status="PASSED">
+                <properties>
+                  <property name="data_binding">
+                    <![CDATA[ {"(Default) label...":"{actualInsuredName\u003dActual Insured, addressLine1\u003dAddress line 1, cityName\u003dCity, postCode\u003dPost Code, parentInsuredName\u003dParent Insured, searchName\u003dSearch Name, insuredName\u003dName}","(Default) testD...":"PartyManagement","(Default) dropD...":"{publicPrivateDropDown\u003dPublic/Private, countryDropDown\u003dCountry, divisionDropDown\u003dNAIC Division, descriptionDropDown\u003dNAIC Description}","(Default) party...":"Party Management","(Default) insur...":"Insured"} ]]>
+                  </property>
+                </properties>
+                <system-out>
+                  <![CDATA[ 29-09-2025T11:37:27 - [TEST_CASE][PASSED] - Test Cases/PartyManagement/262236_CreateGeneralnsured: null 29-09-2025T11:37:27 - [TEST_STEP][PASSED] - Start listener action : sampleBeforeTestCase: Current window maximized 29-09-2025T11:37:27 - [TEST_STEP][PASSED] - println(testCaseContext.getTestCaseId()): null 29-09-2025T11:37:27 - [TEST_STEP][PASSED] - println(testCaseContext.getTestCaseVariables()): null 29-09-2025T11:37:27 - [TEST_STEP][PASSED] - openBrowserLaunchApplication(): null 29-09-2025T11:37:27 - [TEST_STEP][PASSED] - openBrowser(null): Browser is opened with url: 'null' 29-09-2025T11:37:28 - [MESSAGE][INFO] - Starting 'Chrome (headless)' driver 29-09-2025T11:37:28 - [MESSAGE][INFO] - Action delay is set to 0 milliseconds 29-09-2025T11:37:30 - [MESSAGE][PASSED] - Browser is opened with url: 'null' 29-09-2025T11:37:30 - [TEST_STEP][PASSED] - maximizeWindow(): Current window maximized 29-09-2025T11:37:30 - [MESSAGE][PASSED] - Current window maximized 29-09-2025T11:37:30 - [TEST_STEP][PASSED] - Start listener action : sampleAfterTestCase: null 29-09-2025T11:37:30 - [TEST_STEP][PASSED] - println(testCaseContext.getTestCaseId()): null 29-09-2025T11:37:30 - [TEST_STEP][PASSED] - println(testCaseContext.getTestCaseStatus()): null ]]>
+                </system-out>
+                <system-err>
+                  <![CDATA[ ]]>
+                </system-err>
+              </testcase>
+              <system-out>
+                <![CDATA[ 29-09-2025T11:37:27 - [TEST_SUITE][PASSED] - MigrationTestCase: null ]]>
+              </system-out>
+              <system-err>
+                <![CDATA[ ]]>
+              </system-err>
+            </testsuite>
+          </testsuites>
+          EOF
 
-          - name: Generate Allure Report (if applicable)
-            run: |
-              allure generate allure-results --clean -o allure-report
-            # Ensure allure-results directory is created by your test run
+      # --- Step 2: Generate HTML dashboard from XML (CORRECTED JAVASCRIPT) ---
+      - name: Generate HTML dashboard from XML
+        run: |
+          cat <<'EOF' > index.html
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>GitHub Actions Test Report</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; }
+              h1 { text-align: center; }
+              canvas { max-width: 600px; margin: 0 auto; display: block; }
+            </style>
+          </head>
+          <body>
+            <h1>Test Results Dashboard</h1>
+            <canvas id="resultsChart"></canvas>
 
-          - name: Upload Pages artifact
-            uses: actions/upload-pages-artifact@v3
-            with:
-              path: 'allure-report' # Or the path to your generated HTML reports
+            <script>
+              async function loadAndVisualize() {
+                const response = await fetch('test-results.xml');
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+                
+                // Get all <testcase> elements
+                const testcases = Array.from(xmlDoc.getElementsByTagName('testcase'));
+                
+                // Use the 'status' attribute and convert to uppercase for reliable matching
+                const results = testcases.map(tc => tc.getAttribute('status').toUpperCase());
 
-          - name: Deploy to GitHub Pages
-            id: deployment
-            uses: actions/deploy-pages@v4
+                // Filter based on the 'PASSED' status
+                const passCount = results.filter(r => r === 'PASSED').length;
+                // Filter for 'FAILED' or any other non-passed status like 'ERROR'
+                const failCount = results.filter(r => r !== 'PASSED').length;
+
+                const ctx = document.getElementById('resultsChart');
+                new Chart(ctx, {
+                  type: 'bar',
+                  data: {
+                    labels: ['Passed', 'Failed'],
+                    datasets: [{
+                      label: 'Test Results',
+                      data: [passCount, failCount],
+                      backgroundColor: ['#4CAF50', '#F44336']
+                    }]
+                  },
+                  options: {
+                    responsive: true,
+                    scales: {
+                      y: { beginAtZero: true, precision: 0 }
+                    }
+                  }
+                });
+              }
+              loadAndVisualize();
+            </script>
+          </body>
+          </html>
+          EOF
+
+      # --- Step 3: Deployment (Using the official Pages method) ---
+      # This step is required for the new GitHub Pages pipeline
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # Upload the generated files as an artifact
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload the current directory, which contains index.html and test-results.xml
+          path: . 
+
+      # Deploy the artifact to GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
